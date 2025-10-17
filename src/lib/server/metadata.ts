@@ -9,26 +9,18 @@ export interface PageMetadata {
 }
 
 export async function extractMetadata(url: string): Promise<PageMetadata> {
-	console.log(`[Metadata] ====== Starting extraction for: ${url} ======`);
-
 	const urlObj = new URL(url);
 	const metadata: PageMetadata = {
 		title: urlObj.hostname
 	};
 
-	// Special handling for YouTube
+	// Special handling for YouTube using official oEmbed API
 	if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
-		console.log(`[Metadata] ✓ Detected YouTube URL, using oEmbed API`);
-		try {
-			const youtubeMetadata = await extractYouTubeMetadata(url);
-			if (youtubeMetadata) {
-				console.log(`[Metadata] ✓ YouTube oEmbed successful`);
-				return youtubeMetadata;
-			}
-			console.log(`[Metadata] ✗ oEmbed returned null, falling back to standard extraction`);
-		} catch (error) {
-			console.error(`[Metadata] ✗ oEmbed error:`, error);
+		const youtubeMetadata = await extractYouTubeMetadata(url);
+		if (youtubeMetadata) {
+			return youtubeMetadata;
 		}
+		// Fall back to standard extraction if oEmbed fails
 	}
 
 	try {
@@ -57,8 +49,6 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 		}
 
 		const html = await response.text();
-		console.log(`[Metadata] Fetched ${html.length} bytes from ${url}`);
-
 		const dom = new JSDOM(html);
 		const document = dom.window.document;
 
@@ -66,34 +56,25 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 		const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content');
 		const titleTag = document.querySelector('title')?.textContent;
 		metadata.title = ogTitle || titleTag || metadata.title;
-		console.log(`[Metadata] Title: ogTitle="${ogTitle}", titleTag="${titleTag}", final="${metadata.title}"`);
 
 		// Extract description
 		const ogDescription = document.querySelector('meta[property="og:description"]')?.getAttribute('content');
 		const metaDescription = document.querySelector('meta[name="description"]')?.getAttribute('content');
 		metadata.description = ogDescription || metaDescription || undefined;
-		console.log(`[Metadata] Description: og="${ogDescription}", meta="${metaDescription}"`);
 
 		// Extract OG image
 		const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute('content');
 		if (ogImage) {
 			metadata.ogImage = new URL(ogImage, url).href;
-			console.log(`[Metadata] OG Image found: ${metadata.ogImage}`);
-		} else {
-			console.log(`[Metadata] No OG Image found in HTML`);
 		}
 
 		// Extract favicon
 		metadata.favicon = await extractFavicon(url, document);
 
 	} catch (error) {
-		console.error('[Metadata] ✗ Error during extraction:', error);
-		if (error instanceof Error) {
-			console.error('[Metadata] Error details:', error.message, error.stack);
-		}
+		console.error('Error extracting metadata:', error);
 	}
 
-	console.log(`[Metadata] ====== Returning metadata:`, JSON.stringify(metadata, null, 2));
 	return metadata;
 }
 
@@ -150,12 +131,10 @@ async function extractYouTubeMetadata(url: string): Promise<PageMetadata | null>
 		});
 
 		if (!response.ok) {
-			console.warn(`[YouTube oEmbed] Failed: ${response.status}`);
 			return null;
 		}
 
 		const data = await response.json();
-		console.log(`[YouTube oEmbed] Success: title="${data.title}"`);
 
 		// Extract video ID to get high-quality thumbnail
 		const videoId = extractVideoId(url);
@@ -178,7 +157,6 @@ async function extractYouTubeMetadata(url: string): Promise<PageMetadata | null>
 						});
 						if (thumbResponse.ok) {
 							ogImage = thumbUrl;
-							console.log(`[YouTube] Using thumbnail: ${thumbUrl}`);
 							break;
 						}
 					} catch (e) {
@@ -192,11 +170,11 @@ async function extractYouTubeMetadata(url: string): Promise<PageMetadata | null>
 			title: data.title || new URL(url).hostname,
 			description: `By ${data.author_name}`,
 			ogImage: ogImage,
-			favicon: await extractFavicon(url, null) // Will use fallback favicon.ico
+			favicon: await extractFavicon(url, null)
 		};
 
 	} catch (error) {
-		console.error('[YouTube oEmbed] Error:', error);
+		console.error('Error extracting YouTube metadata:', error);
 		return null;
 	}
 }
