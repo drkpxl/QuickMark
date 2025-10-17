@@ -119,7 +119,7 @@ npm run build
 npm run preview
 ```
 
-## ⌨Keyboard Shortcuts
+## Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
