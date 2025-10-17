@@ -6,6 +6,17 @@ A minimalist, self-hosted bookmarking service designed to be your default new ta
 ![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)
 ![SvelteKit](https://img.shields.io/badge/SvelteKit-FF3E00?style=flat&logo=svelte&logoColor=white)
 
+## Screenshots
+
+### Compact List View
+![Compact View - showing bookmarks with favicons, titles, descriptions, and tag filtering](static/Screenshot%202025-10-17%20at%202.03.38%20PM.png)
+
+### Card View with Open Graph Images
+![Card View - grid layout with preview images and tags](static/Screenshot%202025-10-17%20at%202.03.47%20PM.png)
+
+### Empty State
+![Empty state - clean interface ready for your first bookmark](static/Screenshot%202025-10-17%20at%202.02.11%20PM.png)
+
 ## ✨ Features
 
 - **🚀 Fast & Lightweight**: Single-page application optimized for speed
@@ -71,7 +82,7 @@ environment:
   - PORT=9022  # Keep internal port at 9022
 ```
 
-## 💻 Local Development
+## Local Development
 
 ### Prerequisites
 
@@ -108,7 +119,7 @@ npm run build
 npm run preview
 ```
 
-## ⌨️ Keyboard Shortcuts
+## ⌨Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
@@ -121,13 +132,13 @@ npm run preview
 | `Esc` | Clear search or close modal |
 | `?` | Show keyboard shortcuts help |
 
-## 📊 View Modes
+## View Modes
 
 - **📋 Compact List** (default): Single line per bookmark with all metadata visible
 - **🖼️ Card View**: Responsive grid layout with Open Graph images
 - **📝 Dense View**: Minimal list showing only favicons and titles
 
-## 🔖 Using Tags
+## Using Tags
 
 Tags help organize your bookmarks:
 
@@ -136,7 +147,7 @@ Tags help organize your bookmarks:
 3. Multiple tags can be selected simultaneously (AND filtering)
 4. Click "Clear" to reset filters
 
-## 💾 Data Management
+## Data Management
 
 ### Database Location
 
@@ -179,7 +190,9 @@ Use the built-in export functionality:
 - **JSON Export**: Complete bookmark data with all metadata
 - **HTML Export**: Standard Netscape bookmarks format (compatible with all browsers)
 
-## 🏗️ Architecture
+![JSON Export Example](static/Screenshot%202025-10-17%20at%202.04.17%20PM.png)
+
+## Architecture
 
 ### Tech Stack
 
@@ -208,14 +221,7 @@ src/
         └── metadata.ts              # Metadata extraction logic
 ```
 
-## 🔐 Security Features
-
-- **No External Requests**: Assets are proxied and stored locally
-- **Path Validation**: Directory traversal protection for asset serving
-- **Content Sanitization**: All extracted metadata is sanitized before storage
-- **Rate Limiting**: Built-in timeout for metadata fetching (5 seconds)
-
-## 🚢 Deployment
+## Deployment
 
 
 ### Environment Variables
@@ -228,7 +234,7 @@ src/
 
 
 
-## 📝 API Endpoints
+## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -238,7 +244,13 @@ src/
 | `GET` | `/api/export?format=json\|html` | Export bookmarks |
 | `GET` | `/assets/:path` | Serve locally stored assets |
 
-## 🤝 Contributing
+## Roadmap 
+
+
+* Uptime monitoring, see if a link is dead and update that its a deadlink
+* Archive.org intergration. 
+
+##  Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -248,17 +260,17 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built with [SvelteKit](https://kit.svelte.dev/)
 - Styled with [Bootstrap](https://getbootstrap.com/)
 - Icons from [Bootstrap Icons](https://icons.getbootstrap.com/)
 
-## 🐛 Issues & Support
+## Issues & Support
 
 If you encounter any issues or have questions, please [open an issue](https://github.com/drkpxl/quickmark/issues) on GitHub.
 
