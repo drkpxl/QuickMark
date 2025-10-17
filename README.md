@@ -9,13 +9,13 @@ A minimalist, self-hosted bookmarking service designed to be your default new ta
 ## Screenshots
 
 ### Compact List View
-![Compact View - showing bookmarks with favicons, titles, descriptions, and tag filtering](static/Screenshot%202025-10-17%20at%202.03.38%20PM.png)
+![Compact View - showing bookmarks with favicons, titles, descriptions, and tag filtering](./static/compact-view.png)
 
 ### Card View with Open Graph Images
-![Card View - grid layout with preview images and tags](static/Screenshot%202025-10-17%20at%202.03.47%20PM.png)
+![Card View - grid layout with preview images and tags](./static/card-view.png)
 
 ### Empty State
-![Empty state - clean interface ready for your first bookmark](static/Screenshot%202025-10-17%20at%202.02.11%20PM.png)
+![Empty state - clean interface ready for your first bookmark](./static/empty-state.png)
 
 ## ✨ Features
 
@@ -190,7 +190,7 @@ Use the built-in export functionality:
 - **JSON Export**: Complete bookmark data with all metadata
 - **HTML Export**: Standard Netscape bookmarks format (compatible with all browsers)
 
-![JSON Export Example](static/Screenshot%202025-10-17%20at%202.04.17%20PM.png)
+![JSON Export Example](./static/json-export.png)
 
 ## Architecture
 
