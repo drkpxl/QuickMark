@@ -20,7 +20,9 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		// Extract metadata
+		console.log(`[Bookmark API] Starting metadata extraction for: ${url}`);
 		const metadata = await extractMetadata(url);
+		console.log(`[Bookmark API] Metadata extracted:`, JSON.stringify(metadata, null, 2));
 
 		// Save bookmark
 		const bookmark = createBookmark({

@@ -9,6 +9,8 @@ export interface PageMetadata {
 }
 
 export async function extractMetadata(url: string): Promise<PageMetadata> {
+	console.log(`[Metadata] ====== Starting extraction for: ${url} ======`);
+
 	const urlObj = new URL(url);
 	const metadata: PageMetadata = {
 		title: urlObj.hostname
@@ -16,12 +18,17 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 
 	// Special handling for YouTube
 	if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
-		console.log(`[Metadata] Detected YouTube URL, using oEmbed API`);
-		const youtubeMetadata = await extractYouTubeMetadata(url);
-		if (youtubeMetadata) {
-			return youtubeMetadata;
+		console.log(`[Metadata] ✓ Detected YouTube URL, using oEmbed API`);
+		try {
+			const youtubeMetadata = await extractYouTubeMetadata(url);
+			if (youtubeMetadata) {
+				console.log(`[Metadata] ✓ YouTube oEmbed successful`);
+				return youtubeMetadata;
+			}
+			console.log(`[Metadata] ✗ oEmbed returned null, falling back to standard extraction`);
+		} catch (error) {
+			console.error(`[Metadata] ✗ oEmbed error:`, error);
 		}
-		console.log(`[Metadata] oEmbed failed, falling back to standard extraction`);
 	}
 
 	try {
@@ -80,9 +87,13 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 		metadata.favicon = await extractFavicon(url, document);
 
 	} catch (error) {
-		console.error('Error extracting metadata:', error);
+		console.error('[Metadata] ✗ Error during extraction:', error);
+		if (error instanceof Error) {
+			console.error('[Metadata] Error details:', error.message, error.stack);
+		}
 	}
 
+	console.log(`[Metadata] ====== Returning metadata:`, JSON.stringify(metadata, null, 2));
 	return metadata;
 }
 
