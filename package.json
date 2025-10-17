@@ -1,6 +1,6 @@
 {
 	"name": "quickmark",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "A minimalist, self-hosted bookmarking service designed to be your default new tab page",
 	"author": "drkpxl",
 	"license": "MIT",
