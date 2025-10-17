@@ -1,0 +1,28 @@
+services:
+  quickmark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quickmark
+    restart: unless-stopped
+    ports:
+      - "9022:9022"
+    volumes:
+      # Mount data directory for database and assets persistence
+      # This makes backups easy - just copy the ./data directory
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=9022
+      - HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9022"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Optional: Use a named volume instead of bind mount
+# volumes:
+#   quickmark_data:
+#     driver: local

@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Build artifacts
+/.svelte-kit/
+/build/
+/dist/
+.svelte-kit/
+
+# Data directory (user bookmarks and assets)
+data/
+
+# Environment files
+.env
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# System files
+.DS_Store
+*.swp
+*.swo
+
+# IDE files
+.vscode/
+.idea/
+
+# Testing
+coverage/
+
+# Documentation (keep PRD accessible for context but exclude from regular analysis)
+# bookmark-service-prd.md
+
+# Misc
+vite.config.*.timestamp-*

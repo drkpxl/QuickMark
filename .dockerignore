@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+npm-debug.log
+# package-lock.json is needed for npm ci
+
+# Build outputs
+build
+.svelte-kit
+dist
+
+# Data (will be mounted as volume)
+data
+*.db
+*.db-shm
+*.db-wal
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# Documentation (not needed in image)
+*.md
+!README.md
+
+# CI/CD
+.github
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Claude
+.claude
+.claudeignore
