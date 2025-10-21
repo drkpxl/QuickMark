@@ -103,6 +103,41 @@ export function createBookmark(data: {
 	return getBookmark(result.lastInsertRowid as number)!;
 }
 
+export function updateBookmark(id: number, data: {
+	url: string;
+	domain: string;
+	title?: string;
+	description?: string;
+	favicon_path?: string;
+	og_image_path?: string;
+	tags?: string;
+}): Bookmark | undefined {
+	const stmt = db.prepare(`
+		UPDATE bookmarks
+		SET url = ?, domain = ?, title = ?, description = ?,
+		    favicon_path = ?, og_image_path = ?, tags = ?,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`);
+
+	const result = stmt.run(
+		data.url,
+		data.domain,
+		data.title || null,
+		data.description || null,
+		data.favicon_path || null,
+		data.og_image_path || null,
+		data.tags || null,
+		id
+	);
+
+	if (result.changes > 0) {
+		return getBookmark(id);
+	}
+
+	return undefined;
+}
+
 export function deleteBookmark(id: number): boolean {
 	const stmt = db.prepare('DELETE FROM bookmarks WHERE id = ?');
 	const result = stmt.run(id);

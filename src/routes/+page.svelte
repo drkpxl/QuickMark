@@ -13,6 +13,10 @@
 	let selectedIndex = $state(-1);
 	let showHelp = $state(false);
 	let selectedTags = $state<Set<string>>(new Set());
+	let editingBookmark = $state<typeof data.bookmarks[0] | null>(null);
+	let editUrl = $state('');
+	let editTags = $state('');
+	let updating = $state(false);
 
 	onMount(() => {
 		// Load view preference from localStorage
@@ -90,6 +94,49 @@
 		}
 	}
 
+	function startEdit(bookmark: typeof data.bookmarks[0]) {
+		editingBookmark = bookmark;
+		editUrl = bookmark.url;
+		editTags = bookmark.tags || '';
+	}
+
+	function cancelEdit() {
+		editingBookmark = null;
+		editUrl = '';
+		editTags = '';
+	}
+
+	async function updateBookmark() {
+		if (!editingBookmark || !editUrl.trim()) return;
+
+		updating = true;
+		message = '';
+
+		try {
+			const response = await fetch(`/api/bookmark/${editingBookmark.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ url: editUrl.trim(), tags: editTags.trim() || null })
+			});
+
+			if (response.ok) {
+				message = 'Bookmark updated!';
+				cancelEdit();
+				// Reload bookmarks
+				window.location.reload();
+			} else {
+				const error = await response.json();
+				message = error.message || 'Failed to update bookmark';
+			}
+		} catch (err) {
+			message = 'Error updating bookmark';
+			console.error(err);
+		} finally {
+			updating = false;
+			setTimeout(() => message = '', 3000);
+		}
+	}
+
 	async function deleteBookmark(id: number) {
 		if (!confirm('Delete this bookmark?')) return;
 
@@ -133,6 +180,12 @@
 			return;
 		}
 
+		// Close edit modal on Escape
+		if (e.key === 'Escape' && editingBookmark) {
+			cancelEdit();
+			return;
+		}
+
 		// Navigation keys
 		if (e.key === 'j' || e.key === 'ArrowDown') {
 			e.preventDefault();
@@ -153,6 +206,13 @@
 			e.preventDefault();
 			const bookmark = filteredBookmarks[selectedIndex];
 			window.open(bookmark.url, '_blank', 'noopener,noreferrer');
+		}
+
+		// Edit selected bookmark
+		if (e.key === 'e' && selectedIndex >= 0 && selectedIndex < filteredBookmarks.length) {
+			e.preventDefault();
+			const bookmark = filteredBookmarks[selectedIndex];
+			startEdit(bookmark);
 		}
 
 		// Delete selected bookmark
@@ -425,15 +485,26 @@
 									</div>
 								</div>
 							</a>
-							<button
-								class="btn btn-sm btn-link text-muted opacity-50 ms-3"
-								onclick={() => deleteBookmark(bookmark.id)}
-								aria-label="Delete bookmark"
-								onmouseenter={(e) => { e.currentTarget.classList.remove('opacity-50'); e.currentTarget.classList.add('text-danger'); }}
-								onmouseleave={(e) => { e.currentTarget.classList.add('opacity-50'); e.currentTarget.classList.remove('text-danger'); }}
-							>
-								<i class="bi bi-trash"></i>
-							</button>
+							<div class="d-flex gap-1">
+								<button
+									class="btn btn-sm btn-link text-muted opacity-50"
+									onclick={() => startEdit(bookmark)}
+									aria-label="Edit bookmark"
+									onmouseenter={(e) => { e.currentTarget.classList.remove('opacity-50'); }}
+									onmouseleave={(e) => { e.currentTarget.classList.add('opacity-50'); }}
+								>
+									<i class="bi bi-pencil"></i>
+								</button>
+								<button
+									class="btn btn-sm btn-link text-muted opacity-50"
+									onclick={() => deleteBookmark(bookmark.id)}
+									aria-label="Delete bookmark"
+									onmouseenter={(e) => { e.currentTarget.classList.remove('opacity-50'); e.currentTarget.classList.add('text-danger'); }}
+									onmouseleave={(e) => { e.currentTarget.classList.add('opacity-50'); e.currentTarget.classList.remove('text-danger'); }}
+								>
+									<i class="bi bi-trash"></i>
+								</button>
+							</div>
 						</div>
 					{/each}
 				</div>
@@ -448,16 +519,26 @@
 								class:border-primary={selectedIndex === index}
 								class:shadow={selectedIndex === index}
 							>
-								<button
-									class="btn btn-sm btn-link text-muted opacity-50 position-absolute top-0 end-0 m-2"
-									onclick={(e) => { e.preventDefault(); deleteBookmark(bookmark.id); }}
-									aria-label="Delete bookmark"
-									style="z-index: 10;"
-									onmouseenter={(e) => { e.currentTarget.classList.remove('opacity-50'); e.currentTarget.classList.add('text-danger'); }}
-									onmouseleave={(e) => { e.currentTarget.classList.add('opacity-50'); e.currentTarget.classList.remove('text-danger'); }}
-								>
-									<i class="bi bi-trash"></i>
-								</button>
+								<div class="position-absolute top-0 end-0 m-2 d-flex gap-1" style="z-index: 10;">
+									<button
+										class="btn btn-sm btn-link text-muted opacity-50"
+										onclick={(e) => { e.preventDefault(); startEdit(bookmark); }}
+										aria-label="Edit bookmark"
+										onmouseenter={(e) => { e.currentTarget.classList.remove('opacity-50'); }}
+										onmouseleave={(e) => { e.currentTarget.classList.add('opacity-50'); }}
+									>
+										<i class="bi bi-pencil"></i>
+									</button>
+									<button
+										class="btn btn-sm btn-link text-muted opacity-50"
+										onclick={(e) => { e.preventDefault(); deleteBookmark(bookmark.id); }}
+										aria-label="Delete bookmark"
+										onmouseenter={(e) => { e.currentTarget.classList.remove('opacity-50'); e.currentTarget.classList.add('text-danger'); }}
+										onmouseleave={(e) => { e.currentTarget.classList.add('opacity-50'); e.currentTarget.classList.remove('text-danger'); }}
+									>
+										<i class="bi bi-trash"></i>
+									</button>
+								</div>
 								<div style="height: 200px; background-color: var(--bs-secondary-bg); display: flex; align-items: center; justify-content: center;">
 									{#if bookmark.og_image_path}
 										<img
@@ -553,15 +634,26 @@
 								<span class="me-2">🔖</span>
 							{/if}
 							<span class="flex-grow-1">{bookmark.title || bookmark.url}</span>
-							<button
-								class="btn btn-sm btn-link text-muted opacity-50"
-								onclick={(e) => { e.preventDefault(); deleteBookmark(bookmark.id); }}
-								aria-label="Delete bookmark"
-								onmouseenter={(e) => { e.currentTarget.classList.remove('opacity-50'); e.currentTarget.classList.add('text-danger'); }}
-								onmouseleave={(e) => { e.currentTarget.classList.add('opacity-50'); e.currentTarget.classList.remove('text-danger'); }}
-							>
-								<i class="bi bi-trash"></i>
-							</button>
+							<div class="d-flex gap-1">
+								<button
+									class="btn btn-sm btn-link text-muted opacity-50"
+									onclick={(e) => { e.preventDefault(); startEdit(bookmark); }}
+									aria-label="Edit bookmark"
+									onmouseenter={(e) => { e.currentTarget.classList.remove('opacity-50'); }}
+									onmouseleave={(e) => { e.currentTarget.classList.add('opacity-50'); }}
+								>
+									<i class="bi bi-pencil"></i>
+								</button>
+								<button
+									class="btn btn-sm btn-link text-muted opacity-50"
+									onclick={(e) => { e.preventDefault(); deleteBookmark(bookmark.id); }}
+									aria-label="Delete bookmark"
+									onmouseenter={(e) => { e.currentTarget.classList.remove('opacity-50'); e.currentTarget.classList.add('text-danger'); }}
+									onmouseleave={(e) => { e.currentTarget.classList.add('opacity-50'); e.currentTarget.classList.remove('text-danger'); }}
+								>
+									<i class="bi bi-trash"></i>
+								</button>
+							</div>
 						</a>
 					{/each}
 				</div>
@@ -612,6 +704,10 @@
 								<td>Open selected bookmark</td>
 							</tr>
 							<tr>
+								<td><kbd>e</kbd></td>
+								<td>Edit selected bookmark</td>
+							</tr>
+							<tr>
 								<td><kbd>d</kbd></td>
 								<td>Delete selected bookmark</td>
 							</tr>
@@ -637,6 +733,75 @@
 				<div class="modal-footer">
 					<button type="button" class="btn btn-secondary" onclick={() => showHelp = false}>
 						Close
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Edit Modal -->
+{#if editingBookmark}
+	<div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+		<div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">Edit Bookmark</h5>
+					<button
+						type="button"
+						class="btn-close"
+						onclick={cancelEdit}
+						aria-label="Close"
+					></button>
+				</div>
+				<div class="modal-body">
+					<div class="mb-3">
+						<label for="edit-url" class="form-label">URL</label>
+						<input
+							type="url"
+							class="form-control"
+							id="edit-url"
+							bind:value={editUrl}
+							disabled={updating}
+							placeholder="https://example.com"
+						/>
+					</div>
+					<div class="mb-3">
+						<label for="edit-tags" class="form-label">Tags (comma-separated)</label>
+						<input
+							type="text"
+							class="form-control"
+							id="edit-tags"
+							bind:value={editTags}
+							disabled={updating}
+							placeholder="tag1, tag2, tag3"
+						/>
+					</div>
+					<small class="text-muted">
+						Note: Metadata (title, description, favicon, image) will be refetched from the URL when you save.
+					</small>
+				</div>
+				<div class="modal-footer">
+					<button
+						type="button"
+						class="btn btn-secondary"
+						onclick={cancelEdit}
+						disabled={updating}
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						class="btn btn-primary"
+						onclick={updateBookmark}
+						disabled={updating || !editUrl.trim()}
+					>
+						{#if updating}
+							<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+							Updating...
+						{:else}
+							💾 Save Changes
+						{/if}
 					</button>
 				</div>
 			</div>
