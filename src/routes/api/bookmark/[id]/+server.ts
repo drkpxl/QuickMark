@@ -11,7 +11,7 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 			return json({ message: 'Invalid bookmark ID' }, { status: 400 });
 		}
 
-		const { url, title, tags } = await request.json();
+		const { url, title, tags, description } = await request.json();
 
 		if (!url || typeof url !== 'string') {
 			return json({ message: 'Invalid URL' }, { status: 400 });
@@ -28,13 +28,22 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 		// Extract metadata
 		const metadata = await extractMetadata(url);
 
+		// Use custom title if provided, otherwise use metadata title
+		const finalTitle = title !== null && title !== undefined && title.trim() !== ''
+			? title
+			: metadata.title;
+
+		// Use custom description if provided, otherwise use metadata description
+		const finalDescription = description !== null && description !== undefined && description.trim() !== ''
+			? description
+			: metadata.description;
+
 		// Update bookmark
-		// Use manual title if provided, otherwise use extracted metadata title
 		const bookmark = updateBookmark(id, {
 			url: urlObj.href,
 			domain: urlObj.hostname,
-			title: title || metadata.title,
-			description: metadata.description,
+			title: finalTitle,
+			description: finalDescription,
 			favicon_path: metadata.favicon,
 			og_image_path: metadata.ogImage,
 			tags: tags || null
