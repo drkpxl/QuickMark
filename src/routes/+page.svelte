@@ -20,6 +20,14 @@
 	let editDescription = $state('');
 	let updating = $state(false);
 
+	// Autocomplete state
+	let showAutocomplete = $state(false);
+	let autocompleteIndex = $state(-1);
+	let tagInputRef = $state<HTMLInputElement | null>(null);
+	let showEditAutocomplete = $state(false);
+	let editAutocompleteIndex = $state(-1);
+	let editTagInputRef = $state<HTMLInputElement | null>(null);
+
 	onMount(() => {
 		// Load view preference from localStorage
 		const savedView = localStorage.getItem('viewLayout') as 'compact' | 'card' | 'dense' | null;
@@ -253,6 +261,141 @@
 		).sort()
 	);
 
+	// Get the current tag being typed (after the last comma)
+	function getCurrentTag(value: string, cursorPos: number): { prefix: string; currentTag: string; suffix: string } {
+		const beforeCursor = value.substring(0, cursorPos);
+		const afterCursor = value.substring(cursorPos);
+		const lastCommaIndex = beforeCursor.lastIndexOf(',');
+
+		if (lastCommaIndex === -1) {
+			return { prefix: '', currentTag: beforeCursor.trim(), suffix: afterCursor };
+		}
+
+		const prefix = beforeCursor.substring(0, lastCommaIndex + 1);
+		const currentTag = beforeCursor.substring(lastCommaIndex + 1).trim();
+		return { prefix, currentTag, suffix: afterCursor };
+	}
+
+	// Get filtered autocomplete suggestions for add form
+	let autocompleteSuggestions = $derived(() => {
+		if (!tagInputRef || !showAutocomplete) return [];
+		const cursorPos = tagInputRef.selectionStart || 0;
+		const { currentTag } = getCurrentTag(tags, cursorPos);
+
+		if (currentTag.length === 0) return [];
+
+		const existingTags = tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+		return allTags
+			.filter(tag =>
+				tag.toLowerCase().startsWith(currentTag.toLowerCase()) &&
+				!existingTags.includes(tag)
+			)
+			.slice(0, 10);
+	});
+
+	// Get filtered autocomplete suggestions for edit form
+	let editAutocompleteSuggestions = $derived(() => {
+		if (!editTagInputRef || !showEditAutocomplete) return [];
+		const cursorPos = editTagInputRef.selectionStart || 0;
+		const { currentTag } = getCurrentTag(editTags, cursorPos);
+
+		if (currentTag.length === 0) return [];
+
+		const existingTags = editTags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+		return allTags
+			.filter(tag =>
+				tag.toLowerCase().startsWith(currentTag.toLowerCase()) &&
+				!existingTags.includes(tag)
+			)
+			.slice(0, 10);
+	});
+
+	function handleTagInput() {
+		if (!tagInputRef) return;
+		const cursorPos = tagInputRef.selectionStart || 0;
+		const { currentTag } = getCurrentTag(tags, cursorPos);
+
+		showAutocomplete = currentTag.length > 0;
+		autocompleteIndex = -1;
+	}
+
+	function handleEditTagInput() {
+		if (!editTagInputRef) return;
+		const cursorPos = editTagInputRef.selectionStart || 0;
+		const { currentTag } = getCurrentTag(editTags, cursorPos);
+
+		showEditAutocomplete = currentTag.length > 0;
+		editAutocompleteIndex = -1;
+	}
+
+	function insertTag(tag: string, isEdit = false) {
+		const inputRef = isEdit ? editTagInputRef : tagInputRef;
+		const currentValue = isEdit ? editTags : tags;
+
+		if (!inputRef) return;
+
+		const cursorPos = inputRef.selectionStart || 0;
+		const { prefix, suffix } = getCurrentTag(currentValue, cursorPos);
+
+		const newValue = prefix + (prefix && !prefix.endsWith(' ') ? ' ' : '') + tag + ', ' + suffix;
+
+		if (isEdit) {
+			editTags = newValue;
+			showEditAutocomplete = false;
+			editAutocompleteIndex = -1;
+		} else {
+			tags = newValue;
+			showAutocomplete = false;
+			autocompleteIndex = -1;
+		}
+
+		// Set cursor position after the inserted tag
+		setTimeout(() => {
+			if (inputRef) {
+				const newCursorPos = prefix.length + (prefix && !prefix.endsWith(' ') ? 1 : 0) + tag.length + 2;
+				inputRef.focus();
+				inputRef.setSelectionRange(newCursorPos, newCursorPos);
+			}
+		}, 0);
+	}
+
+	function handleTagKeydown(e: KeyboardEvent, isEdit = false) {
+		const suggestions = isEdit ? editAutocompleteSuggestions() : autocompleteSuggestions();
+		const showDropdown = isEdit ? showEditAutocomplete : showAutocomplete;
+		const currentIndex = isEdit ? editAutocompleteIndex : autocompleteIndex;
+
+		if (!showDropdown || suggestions.length === 0) return;
+
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			const newIndex = Math.min(currentIndex + 1, suggestions.length - 1);
+			if (isEdit) {
+				editAutocompleteIndex = newIndex;
+			} else {
+				autocompleteIndex = newIndex;
+			}
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			const newIndex = Math.max(currentIndex - 1, -1);
+			if (isEdit) {
+				editAutocompleteIndex = newIndex;
+			} else {
+				autocompleteIndex = newIndex;
+			}
+		} else if (e.key === 'Enter' && currentIndex >= 0) {
+			e.preventDefault();
+			insertTag(suggestions[currentIndex], isEdit);
+		} else if (e.key === 'Escape') {
+			if (isEdit) {
+				showEditAutocomplete = false;
+				editAutocompleteIndex = -1;
+			} else {
+				showAutocomplete = false;
+				autocompleteIndex = -1;
+			}
+		}
+	}
+
 	function toggleTag(tag: string) {
 		const newSelectedTags = new Set(selectedTags);
 		if (newSelectedTags.has(tag)) {
@@ -406,13 +549,37 @@
 						/>
 					</div>
 					<div class="col-12 col-md-3">
-						<input
-							type="text"
-							class="form-control"
-							placeholder="Tags (comma-separated)"
-							bind:value={tags}
-							disabled={saving}
-						/>
+						<div class="position-relative">
+							<input
+								type="text"
+								class="form-control"
+								placeholder="Tags (comma-separated)"
+								bind:value={tags}
+								bind:this={tagInputRef}
+								disabled={saving}
+								oninput={handleTagInput}
+								onkeydown={(e) => handleTagKeydown(e, false)}
+								onfocus={handleTagInput}
+								onblur={() => setTimeout(() => showAutocomplete = false, 200)}
+							/>
+							{#if showAutocomplete && autocompleteSuggestions().length > 0}
+								<div class="position-absolute w-100 shadow-sm" style="top: 100%; left: 0; z-index: 1000; max-height: 200px; overflow-y: auto;">
+									<div class="list-group">
+										{#each autocompleteSuggestions() as suggestion, index}
+											<button
+												type="button"
+												class="list-group-item list-group-item-action"
+												class:active={index === autocompleteIndex}
+												onclick={() => insertTag(suggestion, false)}
+												style="cursor: pointer;"
+											>
+												{suggestion}
+											</button>
+										{/each}
+									</div>
+								</div>
+							{/if}
+						</div>
 					</div>
 					<div class="col-12 col-md-2">
 						<button
@@ -801,14 +968,38 @@
 					</div>
 					<div class="mb-3">
 						<label for="edit-tags" class="form-label">Tags (comma-separated)</label>
-						<input
-							type="text"
-							class="form-control"
-							id="edit-tags"
-							bind:value={editTags}
-							disabled={updating}
-							placeholder="tag1, tag2, tag3"
-						/>
+						<div class="position-relative">
+							<input
+								type="text"
+								class="form-control"
+								id="edit-tags"
+								bind:value={editTags}
+								bind:this={editTagInputRef}
+								disabled={updating}
+								placeholder="tag1, tag2, tag3"
+								oninput={handleEditTagInput}
+								onkeydown={(e) => handleTagKeydown(e, true)}
+								onfocus={handleEditTagInput}
+								onblur={() => setTimeout(() => showEditAutocomplete = false, 200)}
+							/>
+							{#if showEditAutocomplete && editAutocompleteSuggestions().length > 0}
+								<div class="position-absolute w-100 shadow-sm" style="top: 100%; left: 0; z-index: 1000; max-height: 200px; overflow-y: auto;">
+									<div class="list-group">
+										{#each editAutocompleteSuggestions() as suggestion, index}
+											<button
+												type="button"
+												class="list-group-item list-group-item-action"
+												class:active={index === editAutocompleteIndex}
+												onclick={() => insertTag(suggestion, true)}
+												style="cursor: pointer;"
+											>
+												{suggestion}
+											</button>
+										{/each}
+									</div>
+								</div>
+							{/if}
+						</div>
 					</div>
 					<small class="text-muted">
 						Note: If you change the URL, metadata (favicon, image) will be refetched. The title and description you specify will be preserved, or leave them blank to use metadata.
