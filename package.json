@@ -33,6 +33,7 @@
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"@types/better-sqlite3": "^7.6.11",
 		"@types/jsdom": "^27.0.0",
+		"@types/node": "^24.10.0",
 		"svelte": "^5.11.2",
 		"svelte-check": "^4.0.0",
 		"typescript": "^5.0.0",
@@ -43,7 +44,8 @@
 		"better-sqlite3": "^11.0.0",
 		"bootstrap": "^5.3.3",
 		"bootstrap-icons": "^1.13.1",
-		"jsdom": "^25.0.0"
+		"jsdom": "^25.0.0",
+		"playwright": "^1.56.1"
 	},
 	"type": "module"
 }

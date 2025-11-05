@@ -15,6 +15,7 @@
 	let selectedTags = $state<Set<string>>(new Set());
 	let editingBookmark = $state<typeof data.bookmarks[0] | null>(null);
 	let editUrl = $state('');
+	let editTitle = $state('');
 	let editTags = $state('');
 	let editDescription = $state('');
 	let updating = $state(false);
@@ -98,6 +99,7 @@
 	function startEdit(bookmark: typeof data.bookmarks[0]) {
 		editingBookmark = bookmark;
 		editUrl = bookmark.url;
+		editTitle = bookmark.title || '';
 		editTags = bookmark.tags || '';
 		editDescription = bookmark.description || '';
 	}
@@ -105,6 +107,7 @@
 	function cancelEdit() {
 		editingBookmark = null;
 		editUrl = '';
+		editTitle = '';
 		editTags = '';
 		editDescription = '';
 	}
@@ -121,6 +124,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					url: editUrl.trim(),
+					title: editTitle.trim() || null,
 					tags: editTags.trim() || null,
 					description: editDescription.trim() || null
 				})
@@ -774,6 +778,17 @@
 						/>
 					</div>
 					<div class="mb-3">
+						<label for="edit-title" class="form-label">Title</label>
+						<input
+							type="text"
+							class="form-control"
+							id="edit-title"
+							bind:value={editTitle}
+							disabled={updating}
+							placeholder="Custom title for this bookmark"
+						/>
+					</div>
+					<div class="mb-3">
 						<label for="edit-description" class="form-label">Description</label>
 						<textarea
 							class="form-control"
@@ -796,7 +811,7 @@
 						/>
 					</div>
 					<small class="text-muted">
-						Note: If you change the URL, metadata (title, favicon, image) will be refetched. The description will only be updated if you leave it blank.
+						Note: If you change the URL, metadata (favicon, image) will be refetched. The title and description you specify will be preserved, or leave them blank to use metadata.
 					</small>
 				</div>
 				<div class="modal-footer">
