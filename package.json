@@ -32,6 +32,7 @@
 		"@sveltejs/kit": "^2.16.0",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"@types/better-sqlite3": "^7.6.11",
+		"@types/jsdom": "^27.0.0",
 		"svelte": "^5.11.2",
 		"svelte-check": "^4.0.0",
 		"typescript": "^5.0.0",

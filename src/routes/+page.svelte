@@ -16,6 +16,7 @@
 	let editingBookmark = $state<typeof data.bookmarks[0] | null>(null);
 	let editUrl = $state('');
 	let editTags = $state('');
+	let editDescription = $state('');
 	let updating = $state(false);
 
 	onMount(() => {
@@ -98,12 +99,14 @@
 		editingBookmark = bookmark;
 		editUrl = bookmark.url;
 		editTags = bookmark.tags || '';
+		editDescription = bookmark.description || '';
 	}
 
 	function cancelEdit() {
 		editingBookmark = null;
 		editUrl = '';
 		editTags = '';
+		editDescription = '';
 	}
 
 	async function updateBookmark() {
@@ -116,7 +119,11 @@
 			const response = await fetch(`/api/bookmark/${editingBookmark.id}`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ url: editUrl.trim(), tags: editTags.trim() || null })
+				body: JSON.stringify({
+					url: editUrl.trim(),
+					tags: editTags.trim() || null,
+					description: editDescription.trim() || null
+				})
 			});
 
 			if (response.ok) {
@@ -767,6 +774,17 @@
 						/>
 					</div>
 					<div class="mb-3">
+						<label for="edit-description" class="form-label">Description</label>
+						<textarea
+							class="form-control"
+							id="edit-description"
+							bind:value={editDescription}
+							disabled={updating}
+							placeholder="Enter a custom description or leave blank to use metadata"
+							rows="3"
+						></textarea>
+					</div>
+					<div class="mb-3">
 						<label for="edit-tags" class="form-label">Tags (comma-separated)</label>
 						<input
 							type="text"
@@ -778,7 +796,7 @@
 						/>
 					</div>
 					<small class="text-muted">
-						Note: Metadata (title, description, favicon, image) will be refetched from the URL when you save.
+						Note: If you change the URL, metadata (title, favicon, image) will be refetched. The description will only be updated if you leave it blank.
 					</small>
 				</div>
 				<div class="modal-footer">
