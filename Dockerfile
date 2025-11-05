@@ -2,7 +2,7 @@
 # Stage 1: Build the application
 FROM node:22-bookworm-slim AS builder
 
-# Install dependencies required for native modules (better-sqlite3) and Playwright
+# Install dependencies required for native modules (better-sqlite3)
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -16,10 +16,6 @@ COPY package*.json ./
 
 # Install all dependencies (including dev dependencies for build)
 RUN npm ci
-
-# Install Playwright browsers with system dependencies
-# Using chromium only to reduce image size
-RUN npx playwright install --with-deps chromium
 
 # Copy source code
 COPY . .
@@ -35,26 +31,34 @@ FROM node:22-bookworm-slim
 
 WORKDIR /app
 
-# Install runtime dependencies for better-sqlite3 and Playwright
+# Install Playwright system dependencies
+# Note: We install these first so Playwright can find them
 RUN apt-get update && apt-get install -y \
     sqlite3 \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
+    wget \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
     libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libdbus-1-3 \
-    libxkbcommon0 \
+    libatk1.0-0 \
     libatspi2.0-0 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libglib2.0-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libx11-6 \
+    libxcb1 \
     libxcomposite1 \
     libxdamage1 \
+    libxext6 \
     libxfixes3 \
+    libxkbcommon0 \
     libxrandr2 \
-    libgbm1 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy built application from builder
@@ -62,8 +66,9 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
-# Copy Playwright browsers from builder
-COPY --from=builder /root/.cache/ms-playwright /root/.cache/ms-playwright
+# Install Playwright browsers in production stage
+# This ensures they're available at runtime
+RUN npx playwright install chromium
 
 # Create data directory structure for database and assets
 RUN mkdir -p /app/data/assets
