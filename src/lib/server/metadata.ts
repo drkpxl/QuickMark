@@ -35,9 +35,7 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 				'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
 				'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
 				'Accept-Language': 'en-US,en;q=0.9',
-				'Accept-Encoding': 'gzip, deflate, br',
-				'Cache-Control': 'no-cache',
-				'Pragma': 'no-cache',
+				'Accept-Encoding': 'gzip, deflate, br, zstd',
 				'Sec-Ch-Ua': '"Chromium";v="131", "Not_A Brand";v="24"',
 				'Sec-Ch-Ua-Mobile': '?0',
 				'Sec-Ch-Ua-Platform': '"Windows"',
@@ -53,6 +51,32 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 
 		if (!response.ok) {
 			console.warn(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+
+			// For 403 errors, try using Playwright as it's a real browser and harder to detect
+			if (response.status === 403) {
+				console.log(`↻ Retrying ${url} with Playwright browser due to 403 error...`);
+				const browserHtml = await fetchWithBrowser(url);
+				if (browserHtml) {
+					const dom = new JSDOM(browserHtml);
+					const document = dom.window.document;
+
+					// Extract metadata from browser-fetched HTML
+					const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content');
+					const titleTag = document.querySelector('title')?.textContent;
+					metadata.title = ogTitle || titleTag || metadata.title;
+
+					const ogDescription = document.querySelector('meta[property="og:description"]')?.getAttribute('content');
+					const metaDescription = document.querySelector('meta[name="description"]')?.getAttribute('content');
+					metadata.description = ogDescription || metaDescription || undefined;
+
+					metadata.ogImage = await extractAndStoreImage(url, document);
+					metadata.favicon = await extractFavicon(url, document);
+
+					console.log(`✓ Successfully fetched ${url} using Playwright browser`);
+					return metadata;
+				}
+			}
+
 			return metadata;
 		}
 
@@ -81,6 +105,45 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 	}
 
 	return metadata;
+}
+
+async function fetchWithBrowser(url: string): Promise<string | null> {
+	let browser;
+	try {
+		browser = await chromium.launch({
+			headless: true,
+			args: ['--no-sandbox', '--disable-setuid-sandbox']
+		});
+
+		const context = await browser.newContext({
+			viewport: { width: 1280, height: 720 },
+			userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+		});
+
+		const page = await context.newPage();
+
+		// Navigate to page
+		await page.goto(url, {
+			waitUntil: 'networkidle',
+			timeout: 20000
+		});
+
+		// Wait for any dynamic content
+		await page.waitForTimeout(2000);
+
+		// Get the HTML content
+		const html = await page.content();
+
+		await browser.close();
+
+		return html;
+	} catch (error) {
+		if (browser) {
+			await browser.close();
+		}
+		console.error('Browser fetch failed:', error);
+		return null;
+	}
 }
 
 async function extractFavicon(baseUrl: string, document: Document | null): Promise<string | undefined> {
