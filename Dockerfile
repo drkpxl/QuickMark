@@ -68,7 +68,8 @@ COPY --from=builder /app/package.json ./
 
 # Install Playwright browsers in production stage
 # This ensures they're available at runtime
-RUN npx playwright install chromium
+# Install all Playwright browsers and dependencies
+RUN npx playwright install --with-deps
 
 # Create data directory structure for database and assets
 RUN mkdir -p /app/data/assets
