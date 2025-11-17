@@ -122,14 +122,15 @@ async function fetchWithBrowser(url: string): Promise<string | null> {
 
 		const page = await context.newPage();
 
-		// Navigate to page
+		// Navigate to page - use 'domcontentloaded' instead of 'networkidle'
+		// because many sites have persistent connections that prevent networkidle
 		await page.goto(url, {
-			waitUntil: 'networkidle',
+			waitUntil: 'domcontentloaded',
 			timeout: 20000
 		});
 
-		// Wait for any dynamic content
-		await page.waitForTimeout(2000);
+		// Wait for any dynamic content to render
+		await page.waitForTimeout(3000);
 
 		// Get the HTML content
 		const html = await page.content();
@@ -353,14 +354,14 @@ async function takeScreenshot(url: string, hostname: string): Promise<string | u
 
 		const page = await context.newPage();
 
-		// Set a timeout for page load
+		// Navigate to page - use 'domcontentloaded' for better reliability
 		await page.goto(url, {
-			waitUntil: 'networkidle',
+			waitUntil: 'domcontentloaded',
 			timeout: 15000
 		});
 
-		// Wait a bit for any dynamic content
-		await page.waitForTimeout(1000);
+		// Wait for any dynamic content to render
+		await page.waitForTimeout(2000);
 
 		const screenshot = await page.screenshot({
 			type: 'png',
