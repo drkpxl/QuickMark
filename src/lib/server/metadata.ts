@@ -69,8 +69,20 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 					const metaDescription = document.querySelector('meta[name="description"]')?.getAttribute('content');
 					metadata.description = ogDescription || metaDescription || undefined;
 
-					metadata.ogImage = await extractAndStoreImage(url, document);
-					metadata.favicon = await extractFavicon(url, document);
+					// Try to extract images, but don't fail if they timeout
+					try {
+						metadata.ogImage = await extractAndStoreImage(url, document);
+					} catch (error) {
+						console.warn(`Failed to extract OG image for ${url}:`, error);
+						metadata.ogImage = undefined;
+					}
+
+					try {
+						metadata.favicon = await extractFavicon(url, document);
+					} catch (error) {
+						console.warn(`Failed to extract favicon for ${url}:`, error);
+						metadata.favicon = undefined;
+					}
 
 					console.log(`✓ Successfully fetched ${url} using Playwright browser`);
 					return metadata;
@@ -94,11 +106,21 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 		const metaDescription = document.querySelector('meta[name="description"]')?.getAttribute('content');
 		metadata.description = ogDescription || metaDescription || undefined;
 
-		// Extract and store image with fallback strategies
-		metadata.ogImage = await extractAndStoreImage(url, document);
+		// Extract and store image with fallback strategies - don't fail if images timeout
+		try {
+			metadata.ogImage = await extractAndStoreImage(url, document);
+		} catch (error) {
+			console.warn(`Failed to extract OG image for ${url}:`, error);
+			metadata.ogImage = undefined;
+		}
 
-		// Extract favicon
-		metadata.favicon = await extractFavicon(url, document);
+		// Extract favicon - don't fail if it times out
+		try {
+			metadata.favicon = await extractFavicon(url, document);
+		} catch (error) {
+			console.warn(`Failed to extract favicon for ${url}:`, error);
+			metadata.favicon = undefined;
+		}
 
 	} catch (error) {
 		console.error('Error extracting metadata:', error);
