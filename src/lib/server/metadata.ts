@@ -110,27 +110,87 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 async function fetchWithBrowser(url: string): Promise<string | null> {
 	let browser;
 	try {
+		// Launch browser with stealth arguments to avoid bot detection
 		browser = await chromium.launch({
 			headless: true,
-			args: ['--no-sandbox', '--disable-setuid-sandbox']
+			args: [
+				'--no-sandbox',
+				'--disable-setuid-sandbox',
+				'--disable-blink-features=AutomationControlled', // Hide automation
+				'--disable-dev-shm-usage',
+				'--disable-web-security',
+				'--disable-features=IsolateOrigins,site-per-process',
+				'--lang=en-US,en'
+			]
 		});
 
+		// Create context with realistic browser fingerprint
 		const context = await browser.newContext({
-			viewport: { width: 1280, height: 720 },
-			userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+			viewport: { width: 1920, height: 1080 }, // Common desktop resolution
+			userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+			locale: 'en-US',
+			timezoneId: 'America/Denver', // Match a real timezone
+			permissions: ['geolocation'],
+			geolocation: { latitude: 39.7392, longitude: -104.9903 }, // Denver coordinates
+			colorScheme: 'light',
+			extraHTTPHeaders: {
+				'Accept-Language': 'en-US,en;q=0.9',
+				'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+				'Accept-Encoding': 'gzip, deflate, br',
+				'Sec-Ch-Ua': '"Chromium";v="131", "Not_A Brand";v="24", "Google Chrome";v="131"',
+				'Sec-Ch-Ua-Mobile': '?0',
+				'Sec-Ch-Ua-Platform': '"Windows"',
+				'Upgrade-Insecure-Requests': '1'
+			}
 		});
 
 		const page = await context.newPage();
+
+		// Override navigator.webdriver to hide automation
+		await page.addInitScript(() => {
+			Object.defineProperty(navigator, 'webdriver', {
+				get: () => false
+			});
+
+			// Make chrome object more realistic
+			(window as any).chrome = {
+				runtime: {}
+			};
+
+			// Override permissions
+			const originalQuery = window.navigator.permissions.query;
+			window.navigator.permissions.query = (parameters: any) => (
+				parameters.name === 'notifications' ?
+					Promise.resolve({ state: 'denied' } as PermissionStatus) :
+					originalQuery(parameters)
+			);
+		});
 
 		// Navigate to page - use 'domcontentloaded' instead of 'networkidle'
 		// because many sites have persistent connections that prevent networkidle
 		await page.goto(url, {
 			waitUntil: 'domcontentloaded',
-			timeout: 20000
+			timeout: 30000 // Increased timeout for bot checks
+		});
+
+		// Simulate human-like behavior
+		await page.mouse.move(100, 100);
+		await page.waitForTimeout(1000);
+
+		// Scroll down a bit like a human would
+		await page.evaluate(() => {
+			window.scrollBy(0, 300);
+		});
+
+		await page.waitForTimeout(2000);
+
+		// Scroll back up
+		await page.evaluate(() => {
+			window.scrollTo(0, 0);
 		});
 
 		// Wait for any dynamic content to render
-		await page.waitForTimeout(3000);
+		await page.waitForTimeout(2000);
 
 		// Get the HTML content
 		const html = await page.content();
@@ -342,26 +402,84 @@ async function downloadAndSaveImage(imageUrl: string, hostname: string): Promise
 async function takeScreenshot(url: string, hostname: string): Promise<string | undefined> {
 	let browser;
 	try {
+		// Launch browser with stealth arguments to avoid bot detection
 		browser = await chromium.launch({
 			headless: true,
-			args: ['--no-sandbox', '--disable-setuid-sandbox']
+			args: [
+				'--no-sandbox',
+				'--disable-setuid-sandbox',
+				'--disable-blink-features=AutomationControlled',
+				'--disable-dev-shm-usage',
+				'--disable-web-security',
+				'--disable-features=IsolateOrigins,site-per-process',
+				'--lang=en-US,en'
+			]
 		});
 
+		// Create context with realistic browser fingerprint
 		const context = await browser.newContext({
-			viewport: { width: 1280, height: 720 },
-			userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+			viewport: { width: 1920, height: 1080 },
+			userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+			locale: 'en-US',
+			timezoneId: 'America/Denver',
+			permissions: ['geolocation'],
+			geolocation: { latitude: 39.7392, longitude: -104.9903 },
+			colorScheme: 'light',
+			extraHTTPHeaders: {
+				'Accept-Language': 'en-US,en;q=0.9',
+				'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+				'Accept-Encoding': 'gzip, deflate, br',
+				'Sec-Ch-Ua': '"Chromium";v="131", "Not_A Brand";v="24", "Google Chrome";v="131"',
+				'Sec-Ch-Ua-Mobile': '?0',
+				'Sec-Ch-Ua-Platform': '"Windows"',
+				'Upgrade-Insecure-Requests': '1'
+			}
 		});
 
 		const page = await context.newPage();
 
+		// Override navigator.webdriver to hide automation
+		await page.addInitScript(() => {
+			Object.defineProperty(navigator, 'webdriver', {
+				get: () => false
+			});
+
+			(window as any).chrome = {
+				runtime: {}
+			};
+
+			const originalQuery = window.navigator.permissions.query;
+			window.navigator.permissions.query = (parameters: any) => (
+				parameters.name === 'notifications' ?
+					Promise.resolve({ state: 'denied' } as PermissionStatus) :
+					originalQuery(parameters)
+			);
+		});
+
 		// Navigate to page - use 'domcontentloaded' for better reliability
 		await page.goto(url, {
 			waitUntil: 'domcontentloaded',
-			timeout: 15000
+			timeout: 30000
+		});
+
+		// Simulate human-like behavior
+		await page.mouse.move(100, 100);
+		await page.waitForTimeout(1000);
+
+		// Scroll to simulate real user
+		await page.evaluate(() => {
+			window.scrollBy(0, 300);
+		});
+
+		await page.waitForTimeout(1500);
+
+		// Scroll back to top for screenshot
+		await page.evaluate(() => {
+			window.scrollTo(0, 0);
 		});
 
 		// Wait for any dynamic content to render
-		await page.waitForTimeout(2000);
+		await page.waitForTimeout(1500);
 
 		const screenshot = await page.screenshot({
 			type: 'png',
