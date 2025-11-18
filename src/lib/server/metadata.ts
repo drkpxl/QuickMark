@@ -1,10 +1,10 @@
 import { JSDOM } from 'jsdom';
 import { saveAsset } from './db';
 import { chromium } from 'playwright-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import stealth from 'puppeteer-extra-plugin-stealth';
 
-// Add stealth plugin to avoid bot detection
-chromium.use(StealthPlugin());
+// Apply stealth plugin for bot detection bypass
+chromium.use(stealth());
 
 export interface PageMetadata {
 	title: string;
@@ -28,9 +28,10 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 		// Fall back to standard extraction if oEmbed fails
 	}
 
+	let fetchSucceeded = false;
 	try {
 		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), 10000); // Increased to 10s
+		const timeout = setTimeout(() => controller.abort(), 5000); // Reduced to 5s for faster Playwright fallback
 
 		const response = await fetch(url, {
 			signal: controller.signal,
@@ -89,6 +90,7 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 					}
 
 					console.log(`✓ Successfully fetched ${url} using Playwright browser`);
+					fetchSucceeded = true;
 					return metadata;
 				}
 			}
@@ -127,7 +129,10 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 		}
 
 	} catch (error) {
-		console.error('Error extracting metadata:', error);
+		// Only log error if Playwright didn't already succeed
+		if (!fetchSucceeded) {
+			console.error('Error extracting metadata:', error);
+		}
 	}
 
 	return metadata;
@@ -136,13 +141,13 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 async function fetchWithBrowser(url: string): Promise<string | null> {
 	let browser;
 	try {
-		// Launch browser with minimal required arguments
-		// Stealth plugin automatically handles most anti-detection measures
+		// Launch browser with stealth arguments
 		browser = await chromium.launch({
 			headless: true,
 			args: [
 				'--no-sandbox',
 				'--disable-setuid-sandbox',
+				'--disable-blink-features=AutomationControlled',
 				'--disable-dev-shm-usage'
 			]
 		});
@@ -169,34 +174,58 @@ async function fetchWithBrowser(url: string): Promise<string | null> {
 
 		const page = await context.newPage();
 
-		// Navigate to page - use 'domcontentloaded' for faster loading
+		// Add anti-detection script
+		await page.addInitScript(() => {
+			// Hide webdriver property
+			Object.defineProperty(navigator, 'webdriver', {
+				get: () => false
+			});
+
+			// Add chrome object
+			(window as any).chrome = {
+				runtime: {},
+				loadTimes: function() {},
+				csi: function() {},
+				app: {}
+			};
+
+			// Fix permissions
+			const originalQuery = window.navigator.permissions.query;
+			window.navigator.permissions.query = (parameters: any) => (
+				parameters.name === 'notifications' ?
+					Promise.resolve({ state: 'denied' } as PermissionStatus) :
+					originalQuery(parameters)
+			);
+		});
+
+		// Navigate to page
 		await page.goto(url, {
 			waitUntil: 'domcontentloaded',
 			timeout: 30000
 		});
 
-		// Wait for any JavaScript redirects or dynamic content
+		// Wait for dynamic content
 		await page.waitForTimeout(2500);
 
-		// Simulate realistic human behavior
+		// Simulate human behavior
 		await page.mouse.move(100, 100);
 		await page.waitForTimeout(500);
 
-		// Scroll down to trigger lazy loading
+		// Scroll down
 		await page.evaluate(() => {
 			window.scrollBy(0, 300);
 		});
 
 		await page.waitForTimeout(1000);
 
-		// Scroll back to top
+		// Scroll back
 		await page.evaluate(() => {
 			window.scrollTo(0, 0);
 		});
 
 		await page.waitForTimeout(500);
 
-		// Get the HTML content - with retry logic for navigation errors
+		// Get HTML content
 		let html;
 		try {
 			html = await page.content();
@@ -413,13 +442,13 @@ async function downloadAndSaveImage(imageUrl: string, hostname: string): Promise
 async function takeScreenshot(url: string, hostname: string): Promise<string | undefined> {
 	let browser;
 	try {
-		// Launch browser with minimal required arguments
-		// Stealth plugin automatically handles most anti-detection measures
+		// Launch browser with stealth arguments
 		browser = await chromium.launch({
 			headless: true,
 			args: [
 				'--no-sandbox',
 				'--disable-setuid-sandbox',
+				'--disable-blink-features=AutomationControlled',
 				'--disable-dev-shm-usage'
 			]
 		});
@@ -446,7 +475,31 @@ async function takeScreenshot(url: string, hostname: string): Promise<string | u
 
 		const page = await context.newPage();
 
-		// Navigate to page - use 'domcontentloaded' for faster loading
+		// Add anti-detection script
+		await page.addInitScript(() => {
+			// Hide webdriver property
+			Object.defineProperty(navigator, 'webdriver', {
+				get: () => false
+			});
+
+			// Add chrome object
+			(window as any).chrome = {
+				runtime: {},
+				loadTimes: function() {},
+				csi: function() {},
+				app: {}
+			};
+
+			// Fix permissions
+			const originalQuery = window.navigator.permissions.query;
+			window.navigator.permissions.query = (parameters: any) => (
+				parameters.name === 'notifications' ?
+					Promise.resolve({ state: 'denied' } as PermissionStatus) :
+					originalQuery(parameters)
+			);
+		});
+
+		// Navigate to page
 		await page.goto(url, {
 			waitUntil: 'domcontentloaded',
 			timeout: 30000
