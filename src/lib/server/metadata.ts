@@ -188,12 +188,17 @@ async function fetchWithBrowser(url: string): Promise<string | null> {
 			);
 		});
 
-		// Navigate to page - use 'domcontentloaded' instead of 'networkidle'
-		// because many sites have persistent connections that prevent networkidle
+		// Navigate to page - use 'load' to ensure page is fully loaded
 		await page.goto(url, {
-			waitUntil: 'domcontentloaded',
+			waitUntil: 'load',
 			timeout: 30000 // Increased timeout for bot checks
 		});
+
+		// Wait for page to be fully loaded and stable
+		await page.waitForLoadState('domcontentloaded');
+
+		// Additional wait for any JavaScript redirects or dynamic loading
+		await page.waitForTimeout(3000);
 
 		// Simulate human-like behavior
 		await page.mouse.move(100, 100);
@@ -211,11 +216,21 @@ async function fetchWithBrowser(url: string): Promise<string | null> {
 			window.scrollTo(0, 0);
 		});
 
-		// Wait for any dynamic content to render
+		// Wait for any dynamic content to render and ensure no navigation is happening
 		await page.waitForTimeout(2000);
+		await page.waitForLoadState('domcontentloaded');
 
-		// Get the HTML content
-		const html = await page.content();
+		// Get the HTML content - wrap in try-catch for navigation errors
+		let html;
+		try {
+			html = await page.content();
+		} catch (contentError) {
+			// If page is still navigating, wait longer and try again
+			console.warn('Page still navigating, waiting longer...');
+			await page.waitForTimeout(3000);
+			await page.waitForLoadState('domcontentloaded');
+			html = await page.content();
+		}
 
 		await browser.close();
 
@@ -478,11 +493,17 @@ async function takeScreenshot(url: string, hostname: string): Promise<string | u
 			);
 		});
 
-		// Navigate to page - use 'domcontentloaded' for better reliability
+		// Navigate to page - use 'load' to ensure page is fully loaded
 		await page.goto(url, {
-			waitUntil: 'domcontentloaded',
+			waitUntil: 'load',
 			timeout: 30000
 		});
+
+		// Wait for page to be fully loaded and stable
+		await page.waitForLoadState('domcontentloaded');
+
+		// Additional wait for any JavaScript redirects or dynamic loading
+		await page.waitForTimeout(3000);
 
 		// Simulate human-like behavior
 		await page.mouse.move(100, 100);
@@ -500,8 +521,9 @@ async function takeScreenshot(url: string, hostname: string): Promise<string | u
 			window.scrollTo(0, 0);
 		});
 
-		// Wait for any dynamic content to render
-		await page.waitForTimeout(1500);
+		// Wait for any dynamic content to render and ensure stability
+		await page.waitForTimeout(2000);
+		await page.waitForLoadState('domcontentloaded');
 
 		const screenshot = await page.screenshot({
 			type: 'png',
