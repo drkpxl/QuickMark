@@ -1,6 +1,10 @@
 import { JSDOM } from 'jsdom';
 import { saveAsset } from './db';
-import { chromium } from 'playwright';
+import { chromium } from 'playwright-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
+// Add stealth plugin to avoid bot detection
+chromium.use(StealthPlugin());
 
 export interface PageMetadata {
 	title: string;
@@ -132,28 +136,25 @@ export async function extractMetadata(url: string): Promise<PageMetadata> {
 async function fetchWithBrowser(url: string): Promise<string | null> {
 	let browser;
 	try {
-		// Launch browser with stealth arguments to avoid bot detection
+		// Launch browser with minimal required arguments
+		// Stealth plugin automatically handles most anti-detection measures
 		browser = await chromium.launch({
 			headless: true,
 			args: [
 				'--no-sandbox',
 				'--disable-setuid-sandbox',
-				'--disable-blink-features=AutomationControlled', // Hide automation
-				'--disable-dev-shm-usage',
-				'--disable-web-security',
-				'--disable-features=IsolateOrigins,site-per-process',
-				'--lang=en-US,en'
+				'--disable-dev-shm-usage'
 			]
 		});
 
 		// Create context with realistic browser fingerprint
 		const context = await browser.newContext({
-			viewport: { width: 1920, height: 1080 }, // Common desktop resolution
+			viewport: { width: 1920, height: 1080 },
 			userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
 			locale: 'en-US',
-			timezoneId: 'America/Denver', // Match a real timezone
+			timezoneId: 'America/Denver',
 			permissions: ['geolocation'],
-			geolocation: { latitude: 39.7392, longitude: -104.9903 }, // Denver coordinates
+			geolocation: { latitude: 39.7392, longitude: -104.9903 },
 			colorScheme: 'light',
 			extraHTTPHeaders: {
 				'Accept-Language': 'en-US,en;q=0.9',
@@ -168,67 +169,40 @@ async function fetchWithBrowser(url: string): Promise<string | null> {
 
 		const page = await context.newPage();
 
-		// Override navigator.webdriver to hide automation
-		await page.addInitScript(() => {
-			Object.defineProperty(navigator, 'webdriver', {
-				get: () => false
-			});
-
-			// Make chrome object more realistic
-			(window as any).chrome = {
-				runtime: {}
-			};
-
-			// Override permissions
-			const originalQuery = window.navigator.permissions.query;
-			window.navigator.permissions.query = (parameters: any) => (
-				parameters.name === 'notifications' ?
-					Promise.resolve({ state: 'denied' } as PermissionStatus) :
-					originalQuery(parameters)
-			);
-		});
-
-		// Navigate to page - use 'load' to ensure page is fully loaded
+		// Navigate to page - use 'domcontentloaded' for faster loading
 		await page.goto(url, {
-			waitUntil: 'load',
-			timeout: 30000 // Increased timeout for bot checks
+			waitUntil: 'domcontentloaded',
+			timeout: 30000
 		});
 
-		// Wait for page to be fully loaded and stable
-		await page.waitForLoadState('domcontentloaded');
+		// Wait for any JavaScript redirects or dynamic content
+		await page.waitForTimeout(2500);
 
-		// Additional wait for any JavaScript redirects or dynamic loading
-		await page.waitForTimeout(3000);
-
-		// Simulate human-like behavior
+		// Simulate realistic human behavior
 		await page.mouse.move(100, 100);
-		await page.waitForTimeout(1000);
+		await page.waitForTimeout(500);
 
-		// Scroll down a bit like a human would
+		// Scroll down to trigger lazy loading
 		await page.evaluate(() => {
 			window.scrollBy(0, 300);
 		});
 
-		await page.waitForTimeout(2000);
+		await page.waitForTimeout(1000);
 
-		// Scroll back up
+		// Scroll back to top
 		await page.evaluate(() => {
 			window.scrollTo(0, 0);
 		});
 
-		// Wait for any dynamic content to render and ensure no navigation is happening
-		await page.waitForTimeout(2000);
-		await page.waitForLoadState('domcontentloaded');
+		await page.waitForTimeout(500);
 
-		// Get the HTML content - wrap in try-catch for navigation errors
+		// Get the HTML content - with retry logic for navigation errors
 		let html;
 		try {
 			html = await page.content();
 		} catch (contentError) {
-			// If page is still navigating, wait longer and try again
 			console.warn('Page still navigating, waiting longer...');
-			await page.waitForTimeout(3000);
-			await page.waitForLoadState('domcontentloaded');
+			await page.waitForTimeout(2000);
 			html = await page.content();
 		}
 
@@ -439,17 +413,14 @@ async function downloadAndSaveImage(imageUrl: string, hostname: string): Promise
 async function takeScreenshot(url: string, hostname: string): Promise<string | undefined> {
 	let browser;
 	try {
-		// Launch browser with stealth arguments to avoid bot detection
+		// Launch browser with minimal required arguments
+		// Stealth plugin automatically handles most anti-detection measures
 		browser = await chromium.launch({
 			headless: true,
 			args: [
 				'--no-sandbox',
 				'--disable-setuid-sandbox',
-				'--disable-blink-features=AutomationControlled',
-				'--disable-dev-shm-usage',
-				'--disable-web-security',
-				'--disable-features=IsolateOrigins,site-per-process',
-				'--lang=en-US,en'
+				'--disable-dev-shm-usage'
 			]
 		});
 
@@ -475,59 +446,36 @@ async function takeScreenshot(url: string, hostname: string): Promise<string | u
 
 		const page = await context.newPage();
 
-		// Override navigator.webdriver to hide automation
-		await page.addInitScript(() => {
-			Object.defineProperty(navigator, 'webdriver', {
-				get: () => false
-			});
-
-			(window as any).chrome = {
-				runtime: {}
-			};
-
-			const originalQuery = window.navigator.permissions.query;
-			window.navigator.permissions.query = (parameters: any) => (
-				parameters.name === 'notifications' ?
-					Promise.resolve({ state: 'denied' } as PermissionStatus) :
-					originalQuery(parameters)
-			);
-		});
-
-		// Navigate to page - use 'load' to ensure page is fully loaded
+		// Navigate to page - use 'domcontentloaded' for faster loading
 		await page.goto(url, {
-			waitUntil: 'load',
+			waitUntil: 'domcontentloaded',
 			timeout: 30000
 		});
 
-		// Wait for page to be fully loaded and stable
-		await page.waitForLoadState('domcontentloaded');
+		// Wait for dynamic content
+		await page.waitForTimeout(2000);
 
-		// Additional wait for any JavaScript redirects or dynamic loading
-		await page.waitForTimeout(3000);
-
-		// Simulate human-like behavior
+		// Simulate human behavior
 		await page.mouse.move(100, 100);
-		await page.waitForTimeout(1000);
+		await page.waitForTimeout(500);
 
-		// Scroll to simulate real user
+		// Scroll to trigger lazy loading
 		await page.evaluate(() => {
 			window.scrollBy(0, 300);
 		});
 
-		await page.waitForTimeout(1500);
+		await page.waitForTimeout(1000);
 
 		// Scroll back to top for screenshot
 		await page.evaluate(() => {
 			window.scrollTo(0, 0);
 		});
 
-		// Wait for any dynamic content to render and ensure stability
-		await page.waitForTimeout(2000);
-		await page.waitForLoadState('domcontentloaded');
+		await page.waitForTimeout(500);
 
 		const screenshot = await page.screenshot({
 			type: 'png',
-			fullPage: false // Just capture the viewport
+			fullPage: false
 		});
 
 		await browser.close();
