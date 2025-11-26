@@ -31,10 +31,15 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		const domain = urlObj.hostname;
 
-		// Download and save image if provided
+		// Download and save image if provided and valid
 		let og_image_path: string | null = null;
 		if (image_url && typeof image_url === 'string') {
-			og_image_path = await downloadAndSaveImage(image_url, domain);
+			// Validate image URL - must be http/https and not blocked
+			const isValidImageUrl = image_url.startsWith('http://') || image_url.startsWith('https://');
+			const isNotBlocked = !image_url.includes('about:blank') && !image_url.includes('data:');
+			if (isValidImageUrl && isNotBlocked) {
+				og_image_path = await downloadAndSaveImage(image_url, domain);
+			}
 		}
 
 		// Download favicon
