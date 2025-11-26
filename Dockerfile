@@ -2,7 +2,7 @@
 # Stage 1: Build the application
 FROM node:22-bookworm-slim AS builder
 
-# Install dependencies required for native modules (better-sqlite3) and Playwright
+# Install dependencies required for native modules (better-sqlite3)
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -16,10 +16,6 @@ COPY package*.json ./
 
 # Install all dependencies (including dev dependencies for build)
 RUN npm ci
-
-# Install Playwright browsers with system dependencies
-# Using chromium only to reduce image size
-RUN npx playwright install --with-deps chromium
 
 # Copy source code
 COPY . .
@@ -45,9 +41,8 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
-# Install Playwright browsers with all required system dependencies
-# This ensures all runtime dependencies are properly installed
-RUN npx playwright install --with-deps chromium
+# Copy static files for bookmarklet
+COPY --from=builder /app/static ./static
 
 # Create data directory structure for database and assets
 RUN mkdir -p /app/data/assets

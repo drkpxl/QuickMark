@@ -4,14 +4,12 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let url = $state('');
-	let tags = $state('');
 	let searchQuery = $state('');
-	let saving = $state(false);
 	let message = $state('');
 	let viewLayout = $state<'compact' | 'card' | 'dense'>('compact');
 	let selectedIndex = $state(-1);
 	let showHelp = $state(false);
+	let showBookmarklet = $state(false);
 	let selectedTags = $state<Set<string>>(new Set());
 	let editingBookmark = $state<typeof data.bookmarks[0] | null>(null);
 	let editUrl = $state('');
@@ -20,13 +18,13 @@
 	let editDescription = $state('');
 	let updating = $state(false);
 
-	// Autocomplete state
-	let showAutocomplete = $state(false);
-	let autocompleteIndex = $state(-1);
-	let tagInputRef = $state<HTMLInputElement | null>(null);
+	// Autocomplete state for edit form
 	let showEditAutocomplete = $state(false);
 	let editAutocompleteIndex = $state(-1);
 	let editTagInputRef = $state<HTMLInputElement | null>(null);
+
+	// Bookmarklet code - will be populated on mount
+	let bookmarkletCode = $state('');
 
 	onMount(() => {
 		// Load view preference from localStorage
@@ -34,7 +32,16 @@
 		if (savedView) {
 			viewLayout = savedView;
 		}
+
+		// Generate bookmarklet code with current origin
+		const apiUrl = window.location.origin;
+		bookmarkletCode = generateBookmarkletCode(apiUrl);
 	});
+
+	function generateBookmarkletCode(apiUrl: string): string {
+		// Minified bookmarklet that opens popup
+		return `javascript:(function(){var s=document.createElement('script');s.src='${apiUrl}/bookmarklet.js?t='+Date.now();document.body.appendChild(s);})();`;
+	}
 
 	function scrollToBookmark(index: number) {
 		const element = document.querySelector(`[data-bookmark-index="${index}"]`);
@@ -72,37 +79,6 @@
 		}
 	}
 
-	async function saveBookmark() {
-		if (!url.trim()) return;
-
-		saving = true;
-		message = '';
-
-		try {
-			const response = await fetch('/api/bookmark', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ url: url.trim(), tags: tags.trim() || null })
-			});
-
-			if (response.ok) {
-				message = 'Bookmark saved!';
-				url = '';
-				tags = '';
-				// Reload bookmarks
-				window.location.reload();
-			} else {
-				const error = await response.json();
-				message = error.message || 'Failed to save bookmark';
-			}
-		} catch (err) {
-			message = 'Error saving bookmark';
-			console.error(err);
-		} finally {
-			saving = false;
-			setTimeout(() => message = '', 3000);
-		}
-	}
 
 	function startEdit(bookmark: typeof data.bookmarks[0]) {
 		editingBookmark = bookmark;
@@ -176,9 +152,6 @@
 		// Don't handle if user is typing in an input
 		const target = e.target as HTMLElement;
 		if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-			if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-				saveBookmark();
-			}
 			if (e.key === 'Escape') {
 				searchQuery = '';
 				selectedIndex = -1;
@@ -276,23 +249,6 @@
 		return { prefix, currentTag, suffix: afterCursor };
 	}
 
-	// Get filtered autocomplete suggestions for add form
-	let autocompleteSuggestions = $derived(() => {
-		if (!tagInputRef || !showAutocomplete) return [];
-		const cursorPos = tagInputRef.selectionStart || 0;
-		const { currentTag } = getCurrentTag(tags, cursorPos);
-
-		if (currentTag.length === 0) return [];
-
-		const existingTags = tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
-		return allTags
-			.filter(tag =>
-				tag.toLowerCase().startsWith(currentTag.toLowerCase()) &&
-				!existingTags.includes(tag)
-			)
-			.slice(0, 10);
-	});
-
 	// Get filtered autocomplete suggestions for edit form
 	let editAutocompleteSuggestions = $derived(() => {
 		if (!editTagInputRef || !showEditAutocomplete) return [];
@@ -310,15 +266,6 @@
 			.slice(0, 10);
 	});
 
-	function handleTagInput() {
-		if (!tagInputRef) return;
-		const cursorPos = tagInputRef.selectionStart || 0;
-		const { currentTag } = getCurrentTag(tags, cursorPos);
-
-		showAutocomplete = currentTag.length > 0;
-		autocompleteIndex = -1;
-	}
-
 	function handleEditTagInput() {
 		if (!editTagInputRef) return;
 		const cursorPos = editTagInputRef.selectionStart || 0;
@@ -328,71 +275,45 @@
 		editAutocompleteIndex = -1;
 	}
 
-	function insertTag(tag: string, isEdit = false) {
-		const inputRef = isEdit ? editTagInputRef : tagInputRef;
-		const currentValue = isEdit ? editTags : tags;
+	function insertTag(tag: string) {
+		if (!editTagInputRef) return;
 
-		if (!inputRef) return;
-
-		const cursorPos = inputRef.selectionStart || 0;
-		const { prefix, suffix } = getCurrentTag(currentValue, cursorPos);
+		const cursorPos = editTagInputRef.selectionStart || 0;
+		const { prefix, suffix } = getCurrentTag(editTags, cursorPos);
 
 		const newValue = prefix + (prefix && !prefix.endsWith(' ') ? ' ' : '') + tag + ', ' + suffix;
 
-		if (isEdit) {
-			editTags = newValue;
-			showEditAutocomplete = false;
-			editAutocompleteIndex = -1;
-		} else {
-			tags = newValue;
-			showAutocomplete = false;
-			autocompleteIndex = -1;
-		}
+		editTags = newValue;
+		showEditAutocomplete = false;
+		editAutocompleteIndex = -1;
 
 		// Set cursor position after the inserted tag
 		setTimeout(() => {
-			if (inputRef) {
+			if (editTagInputRef) {
 				const newCursorPos = prefix.length + (prefix && !prefix.endsWith(' ') ? 1 : 0) + tag.length + 2;
-				inputRef.focus();
-				inputRef.setSelectionRange(newCursorPos, newCursorPos);
+				editTagInputRef.focus();
+				editTagInputRef.setSelectionRange(newCursorPos, newCursorPos);
 			}
 		}, 0);
 	}
 
-	function handleTagKeydown(e: KeyboardEvent, isEdit = false) {
-		const suggestions = isEdit ? editAutocompleteSuggestions() : autocompleteSuggestions();
-		const showDropdown = isEdit ? showEditAutocomplete : showAutocomplete;
-		const currentIndex = isEdit ? editAutocompleteIndex : autocompleteIndex;
+	function handleTagKeydown(e: KeyboardEvent) {
+		const suggestions = editAutocompleteSuggestions();
 
-		if (!showDropdown || suggestions.length === 0) return;
+		if (!showEditAutocomplete || suggestions.length === 0) return;
 
 		if (e.key === 'ArrowDown') {
 			e.preventDefault();
-			const newIndex = Math.min(currentIndex + 1, suggestions.length - 1);
-			if (isEdit) {
-				editAutocompleteIndex = newIndex;
-			} else {
-				autocompleteIndex = newIndex;
-			}
+			editAutocompleteIndex = Math.min(editAutocompleteIndex + 1, suggestions.length - 1);
 		} else if (e.key === 'ArrowUp') {
 			e.preventDefault();
-			const newIndex = Math.max(currentIndex - 1, -1);
-			if (isEdit) {
-				editAutocompleteIndex = newIndex;
-			} else {
-				autocompleteIndex = newIndex;
-			}
-		} else if (e.key === 'Enter' && currentIndex >= 0) {
+			editAutocompleteIndex = Math.max(editAutocompleteIndex - 1, -1);
+		} else if (e.key === 'Enter' && editAutocompleteIndex >= 0) {
 			e.preventDefault();
-			insertTag(suggestions[currentIndex], isEdit);
+			insertTag(suggestions[editAutocompleteIndex]);
 		} else if (e.key === 'Escape') {
-			if (isEdit) {
-				showEditAutocomplete = false;
-				editAutocompleteIndex = -1;
-			} else {
-				showAutocomplete = false;
-				autocompleteIndex = -1;
-			}
+			showEditAutocomplete = false;
+			editAutocompleteIndex = -1;
 		}
 	}
 
@@ -469,6 +390,14 @@
 					📝 Dense
 				</button>
 			</div>
+			<button
+				type="button"
+				class="btn btn-sm btn-primary"
+				onclick={() => showBookmarklet = true}
+				title="Install Bookmarklet"
+			>
+				<i class="bi bi-bookmark-plus me-1"></i> Bookmarklet
+			</button>
 			<div class="btn-group" role="group" aria-label="Export">
 				<button
 					type="button"
@@ -533,78 +462,11 @@
 	</div>
 {/if}
 
-<!-- Add Bookmark -->
-<div class="row mb-3">
-	<div class="col-12">
-		<div class="card">
-			<div class="card-body">
-				<div class="row g-2">
-					<div class="col-12 col-md-7">
-						<input
-							type="url"
-							class="form-control"
-							placeholder="Enter URL to bookmark (Ctrl+Enter to save)"
-							bind:value={url}
-							disabled={saving}
-						/>
-					</div>
-					<div class="col-12 col-md-3">
-						<div class="position-relative">
-							<input
-								type="text"
-								class="form-control"
-								placeholder="Tags (comma-separated)"
-								bind:value={tags}
-								bind:this={tagInputRef}
-								disabled={saving}
-								oninput={handleTagInput}
-								onkeydown={(e) => handleTagKeydown(e, false)}
-								onfocus={handleTagInput}
-								onblur={() => setTimeout(() => showAutocomplete = false, 200)}
-							/>
-							{#if showAutocomplete && autocompleteSuggestions().length > 0}
-								<div class="position-absolute w-100 shadow-sm" style="top: 100%; left: 0; z-index: 1000; max-height: 200px; overflow-y: auto;">
-									<div class="list-group">
-										{#each autocompleteSuggestions() as suggestion, index}
-											<button
-												type="button"
-												class="list-group-item list-group-item-action"
-												class:active={index === autocompleteIndex}
-												onclick={() => insertTag(suggestion, false)}
-												style="cursor: pointer;"
-											>
-												{suggestion}
-											</button>
-										{/each}
-									</div>
-								</div>
-							{/if}
-						</div>
-					</div>
-					<div class="col-12 col-md-2">
-						<button
-							class="btn btn-primary w-100"
-							onclick={saveBookmark}
-							disabled={saving || !url.trim()}
-						>
-							{#if saving}
-								<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-								Saving...
-							{:else}
-								💾 Save
-							{/if}
-						</button>
-					</div>
-				</div>
-				{#if message}
-					<div class="alert alert-{message.includes('Error') || message.includes('Failed') ? 'danger' : 'success'} mt-2 mb-0" role="alert">
-						{message}
-					</div>
-				{/if}
-			</div>
-		</div>
+{#if message}
+	<div class="alert alert-{message.includes('Error') || message.includes('Failed') ? 'danger' : 'success'} mb-3" role="alert">
+		{message}
 	</div>
-</div>
+{/if}
 
 <div class="row">
 	<div class="col-12">
@@ -617,7 +479,14 @@
 							<p class="mb-0">No bookmarks match "{searchQuery}"</p>
 						{:else}
 							<h5>Get Started</h5>
-							<p class="mb-0">Add your first bookmark using the input above!</p>
+							<p class="mb-2">Install the bookmarklet to start saving bookmarks from any page!</p>
+							<button
+								type="button"
+								class="btn btn-primary"
+								onclick={() => showBookmarklet = true}
+							>
+								<i class="bi bi-bookmark-plus me-1"></i> Install Bookmarklet
+							</button>
 						{/if}
 					</div>
 				</div>
@@ -898,10 +767,6 @@
 								<td>Clear search / Close help</td>
 							</tr>
 							<tr>
-								<td><kbd>Ctrl+Enter</kbd></td>
-								<td>Save bookmark (in URL field)</td>
-							</tr>
-							<tr>
 								<td><kbd>?</kbd></td>
 								<td>Toggle this help</td>
 							</tr>
@@ -978,7 +843,7 @@
 								disabled={updating}
 								placeholder="tag1, tag2, tag3"
 								oninput={handleEditTagInput}
-								onkeydown={(e) => handleTagKeydown(e, true)}
+								onkeydown={handleTagKeydown}
 								onfocus={handleEditTagInput}
 								onblur={() => setTimeout(() => showEditAutocomplete = false, 200)}
 							/>
@@ -990,7 +855,7 @@
 												type="button"
 												class="list-group-item list-group-item-action"
 												class:active={index === editAutocompleteIndex}
-												onclick={() => insertTag(suggestion, true)}
+												onclick={() => insertTag(suggestion)}
 												style="cursor: pointer;"
 											>
 												{suggestion}
@@ -1001,9 +866,6 @@
 							{/if}
 						</div>
 					</div>
-					<small class="text-muted">
-						Note: If you change the URL, metadata (favicon, image) will be refetched. The title and description you specify will be preserved, or leave them blank to use metadata.
-					</small>
 				</div>
 				<div class="modal-footer">
 					<button
@@ -1026,6 +888,82 @@
 						{:else}
 							💾 Save Changes
 						{/if}
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Bookmarklet Installation Modal -->
+{#if showBookmarklet}
+	<div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+		<div class="modal-dialog modal-dialog-centered modal-lg">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title"><i class="bi bi-bookmark-plus me-2"></i>Install Bookmarklet</h5>
+					<button
+						type="button"
+						class="btn-close"
+						onclick={() => showBookmarklet = false}
+						aria-label="Close"
+					></button>
+				</div>
+				<div class="modal-body">
+					<div class="alert alert-info">
+						<strong>What is a bookmarklet?</strong><br>
+						A bookmarklet is a special bookmark that runs a small script when clicked. It lets you save any page to QuickMark with one click!
+					</div>
+
+					<h6>Installation Instructions:</h6>
+					<ol class="mb-4">
+						<li class="mb-2">Drag the button below to your bookmarks bar</li>
+						<li class="mb-2">Or right-click it and select "Bookmark this link"</li>
+						<li class="mb-2">When on any page you want to save, click the bookmarklet</li>
+						<li>A popup will appear with the page info pre-filled - edit and save!</li>
+					</ol>
+
+					<div class="text-center p-4 bg-body-secondary rounded mb-4">
+						<p class="text-muted mb-3">Drag this button to your bookmarks bar:</p>
+						<a
+							href={bookmarkletCode}
+							class="btn btn-lg btn-primary"
+							onclick={(e) => { e.preventDefault(); alert('Drag this button to your bookmarks bar!'); }}
+							draggable="true"
+						>
+							<i class="bi bi-bookmark-plus me-2"></i>Save to QuickMark
+						</a>
+					</div>
+
+					<details class="mb-3">
+						<summary class="text-muted" style="cursor: pointer;">Manual installation (advanced)</summary>
+						<div class="mt-2">
+							<p class="small text-muted">Create a new bookmark and paste this as the URL:</p>
+							<div class="input-group">
+								<input
+									type="text"
+									class="form-control form-control-sm font-monospace"
+									value={bookmarkletCode}
+									readonly
+								/>
+								<button
+									class="btn btn-outline-secondary btn-sm"
+									type="button"
+									onclick={() => {
+										navigator.clipboard.writeText(bookmarkletCode);
+										message = 'Copied to clipboard!';
+										setTimeout(() => message = '', 3000);
+									}}
+								>
+									<i class="bi bi-clipboard"></i> Copy
+								</button>
+							</div>
+						</div>
+					</details>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" onclick={() => showBookmarklet = false}>
+						Close
 					</button>
 				</div>
 			</div>
