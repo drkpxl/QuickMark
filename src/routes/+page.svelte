@@ -39,9 +39,9 @@
 	});
 
 	function generateBookmarkletCode(apiUrl: string): string {
-		// Fully inline bookmarklet - no external script loading needed
-		// This bypasses CSP restrictions that block external scripts
-		return `javascript:(function(){var d=document,q=d.querySelector.bind(d),t=q('meta[property="og:title"]'),e=q('meta[property="og:description"]'),i=q('meta[property="og:image"]'),u=encodeURIComponent,p=new URLSearchParams({url:location.href,title:(t?t.content:d.title)||'',description:(e?e.content:'')||'',image_url:(i?i.content:'')||''});window.open('${apiUrl}/save?'+p.toString(),'quickmark','width=500,height=600')})();`;
+		// Simplified inline bookmarklet - extracts metadata and opens popup
+		// Kept short to avoid Chrome truncation issues
+		return `javascript:void(window.open('${apiUrl}/save?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title)+'&description='+encodeURIComponent((document.querySelector('meta[name=description]')||{}).content||'')+'&image_url='+encodeURIComponent((document.querySelector('meta[property="og:image"]')||{}).content||''),'quickmark','width=500,height=600'))`;
 	}
 
 	function scrollToBookmark(index: number) {
@@ -916,51 +916,58 @@
 						A bookmarklet is a special bookmark that runs a small script when clicked. It lets you save any page to QuickMark with one click!
 					</div>
 
-					<h6>Installation Instructions:</h6>
+					<h6>Installation Instructions (Chrome):</h6>
 					<ol class="mb-4">
-						<li class="mb-2">Drag the button below to your bookmarks bar</li>
-						<li class="mb-2">Or right-click it and select "Bookmark this link"</li>
-						<li class="mb-2">When on any page you want to save, click the bookmarklet</li>
-						<li>A popup will appear with the page info pre-filled - edit and save!</li>
+						<li class="mb-2">
+							<strong>Show bookmarks bar:</strong> Press <kbd>Ctrl+Shift+B</kbd> (or <kbd>Cmd+Shift+B</kbd> on Mac)
+						</li>
+						<li class="mb-2">
+							<strong>Create bookmark:</strong> Right-click the bookmarks bar → "Add page..." or press <kbd>Ctrl+D</kbd>
+						</li>
+						<li class="mb-2">
+							<strong>Edit the bookmark:</strong> Set the name to "Save to QuickMark"
+						</li>
+						<li class="mb-2">
+							<strong>Replace the URL:</strong> Delete the URL and paste the code below
+						</li>
+						<li>
+							<strong>Use it:</strong> On any page, click the bookmarklet to save it!
+						</li>
 					</ol>
 
-					<div class="text-center p-4 bg-body-secondary rounded mb-4">
-						<p class="text-muted mb-3">Drag this button to your bookmarks bar:</p>
-						<a
-							href={bookmarkletCode}
-							class="btn btn-lg btn-primary"
-							onclick={(e) => { e.preventDefault(); alert('Drag this button to your bookmarks bar!'); }}
-							draggable="true"
-						>
-							<i class="bi bi-bookmark-plus me-2"></i>Save to QuickMark
-						</a>
+					<div class="mb-4">
+						<label class="form-label small fw-bold">Copy this code as the bookmark URL:</label>
+						<div class="input-group">
+							<input
+								type="text"
+								class="form-control form-control-sm font-monospace bg-dark text-light"
+								value={bookmarkletCode}
+								readonly
+								id="bookmarklet-code"
+							/>
+							<button
+								class="btn btn-primary btn-sm"
+								type="button"
+								onclick={() => {
+									navigator.clipboard.writeText(bookmarkletCode);
+									message = 'Copied to clipboard!';
+									showBookmarklet = false;
+									setTimeout(() => message = '', 3000);
+								}}
+							>
+								<i class="bi bi-clipboard me-1"></i> Copy Code
+							</button>
+						</div>
+						<small class="text-muted mt-1 d-block">
+							The code starts with <code>javascript:</code> - make sure to copy the entire thing!
+						</small>
 					</div>
 
-					<details class="mb-3">
-						<summary class="text-muted" style="cursor: pointer;">Manual installation (advanced)</summary>
-						<div class="mt-2">
-							<p class="small text-muted">Create a new bookmark and paste this as the URL:</p>
-							<div class="input-group">
-								<input
-									type="text"
-									class="form-control form-control-sm font-monospace"
-									value={bookmarkletCode}
-									readonly
-								/>
-								<button
-									class="btn btn-outline-secondary btn-sm"
-									type="button"
-									onclick={() => {
-										navigator.clipboard.writeText(bookmarkletCode);
-										message = 'Copied to clipboard!';
-										setTimeout(() => message = '', 3000);
-									}}
-								>
-									<i class="bi bi-clipboard"></i> Copy
-								</button>
-							</div>
-						</div>
-					</details>
+					<div class="alert alert-warning small mb-0">
+						<i class="bi bi-info-circle me-1"></i>
+						<strong>Note:</strong> Chrome doesn't allow pasting <code>javascript:</code> URLs directly into the address bar.
+						You must create/edit a bookmark and paste it there.
+					</div>
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-secondary" onclick={() => showBookmarklet = false}>
