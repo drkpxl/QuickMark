@@ -916,58 +916,57 @@
 						A bookmarklet is a special bookmark that runs a small script when clicked. It lets you save any page to QuickMark with one click!
 					</div>
 
-					<h6>Installation Instructions (Chrome):</h6>
-					<ol class="mb-4">
-						<li class="mb-2">
-							<strong>Show bookmarks bar:</strong> Press <kbd>Ctrl+Shift+B</kbd> (or <kbd>Cmd+Shift+B</kbd> on Mac)
-						</li>
-						<li class="mb-2">
-							<strong>Create bookmark:</strong> Right-click the bookmarks bar → "Add page..." or press <kbd>Ctrl+D</kbd>
-						</li>
-						<li class="mb-2">
-							<strong>Edit the bookmark:</strong> Set the name to "Save to QuickMark"
-						</li>
-						<li class="mb-2">
-							<strong>Replace the URL:</strong> Delete the URL and paste the code below
-						</li>
-						<li>
-							<strong>Use it:</strong> On any page, click the bookmarklet to save it!
-						</li>
-					</ol>
-
-					<div class="mb-4">
-						<label class="form-label small fw-bold">Copy this code as the bookmark URL:</label>
-						<div class="input-group">
-							<input
-								type="text"
-								class="form-control form-control-sm font-monospace bg-dark text-light"
-								value={bookmarkletCode}
-								readonly
-								id="bookmarklet-code"
-							/>
-							<button
-								class="btn btn-primary btn-sm"
-								type="button"
-								onclick={() => {
-									navigator.clipboard.writeText(bookmarkletCode);
-									message = 'Copied to clipboard!';
-									showBookmarklet = false;
-									setTimeout(() => message = '', 3000);
-								}}
+					<h6 class="mb-3">Method 1: Import Bookmark File (Recommended)</h6>
+					<div class="card bg-body-secondary mb-4">
+						<div class="card-body">
+							<ol class="mb-3 small">
+								<li>Click the download button below</li>
+								<li>Open Chrome → <kbd>Ctrl+Shift+O</kbd> (Bookmark Manager)</li>
+								<li>Click <strong>⋮</strong> menu (top right) → "Import bookmarks"</li>
+								<li>Select the downloaded file</li>
+								<li>Find "Save to QuickMark" in your bookmarks and drag to bookmarks bar</li>
+							</ol>
+							<a
+								href="/api/bookmarklet"
+								class="btn btn-primary"
+								download="quickmark-bookmarklet.html"
 							>
-								<i class="bi bi-clipboard me-1"></i> Copy Code
-							</button>
+								<i class="bi bi-download me-1"></i> Download Bookmarklet File
+							</a>
 						</div>
-						<small class="text-muted mt-1 d-block">
-							The code starts with <code>javascript:</code> - make sure to copy the entire thing!
-						</small>
 					</div>
 
-					<div class="alert alert-warning small mb-0">
-						<i class="bi bi-info-circle me-1"></i>
-						<strong>Note:</strong> Chrome doesn't allow pasting <code>javascript:</code> URLs directly into the address bar.
-						You must create/edit a bookmark and paste it there.
-					</div>
+					<h6 class="mb-3">Method 2: Manual Setup</h6>
+					<details class="mb-3">
+						<summary class="text-muted" style="cursor: pointer;">Click to expand manual instructions</summary>
+						<div class="mt-3">
+							<ol class="small mb-3">
+								<li>Go to <code>chrome://bookmarks</code> in your address bar</li>
+								<li>Click <strong>⋮</strong> menu (top right) → "Add new bookmark"</li>
+								<li>Name: "Save to QuickMark"</li>
+								<li>URL: Paste the code below</li>
+							</ol>
+							<div class="input-group input-group-sm">
+								<input
+									type="text"
+									class="form-control font-monospace bg-dark text-light"
+									value={bookmarkletCode}
+									readonly
+								/>
+								<button
+									class="btn btn-outline-secondary"
+									type="button"
+									onclick={() => {
+										navigator.clipboard.writeText(bookmarkletCode);
+										message = 'Copied to clipboard!';
+										setTimeout(() => message = '', 3000);
+									}}
+								>
+									<i class="bi bi-clipboard"></i>
+								</button>
+							</div>
+						</div>
+					</details>
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-secondary" onclick={() => showBookmarklet = false}>
