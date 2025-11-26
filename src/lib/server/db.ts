@@ -144,10 +144,112 @@ export function deleteBookmark(id: number): boolean {
 	return result.changes > 0;
 }
 
+export function getAllTags(): string[] {
+	const bookmarks = getBookmarks();
+	const tagSet = new Set<string>();
+
+	for (const bookmark of bookmarks) {
+		if (bookmark.tags) {
+			const tags = bookmark.tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+			tags.forEach(tag => tagSet.add(tag));
+		}
+	}
+
+	return Array.from(tagSet).sort();
+}
+
 export function saveAsset(buffer: Buffer, filename: string): string {
 	const filepath = join(assetsPath, filename);
 	writeFileSync(filepath, buffer);
 	return `/assets/${filename}`;
+}
+
+export async function downloadAndSaveImage(imageUrl: string, domain: string): Promise<string | null> {
+	try {
+		const response = await fetch(imageUrl, {
+			headers: {
+				'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+				'Accept': 'image/*,*/*;q=0.8'
+			}
+		});
+
+		if (!response.ok) {
+			console.error(`Failed to download image: ${response.status}`);
+			return null;
+		}
+
+		const contentType = response.headers.get('content-type');
+		if (!contentType || !contentType.startsWith('image/')) {
+			console.error(`Invalid content type: ${contentType}`);
+			return null;
+		}
+
+		const buffer = Buffer.from(await response.arrayBuffer());
+
+		// Skip very small images (likely icons/placeholders)
+		if (buffer.length < 5000) {
+			console.log(`Image too small (${buffer.length} bytes), skipping`);
+			return null;
+		}
+
+		// Determine file extension from content type
+		const extMap: Record<string, string> = {
+			'image/jpeg': 'jpg',
+			'image/jpg': 'jpg',
+			'image/png': 'png',
+			'image/gif': 'gif',
+			'image/webp': 'webp',
+			'image/svg+xml': 'svg'
+		};
+		const ext = extMap[contentType] || 'jpg';
+
+		const filename = `${domain.replace(/[^a-z0-9]/gi, '-')}-og-${Date.now()}.${ext}`;
+		return saveAsset(buffer, filename);
+	} catch (error) {
+		console.error('Error downloading image:', error);
+		return null;
+	}
+}
+
+export async function downloadFavicon(url: string, domain: string): Promise<string | null> {
+	try {
+		// Try common favicon locations
+		const faviconUrls = [
+			`https://${domain}/favicon.ico`,
+			`https://${domain}/favicon.png`,
+			`https://www.google.com/s2/favicons?domain=${domain}&sz=32`
+		];
+
+		for (const faviconUrl of faviconUrls) {
+			try {
+				const response = await fetch(faviconUrl, {
+					headers: {
+						'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+					}
+				});
+
+				if (response.ok) {
+					const contentType = response.headers.get('content-type') || '';
+					if (contentType.includes('image') || faviconUrl.endsWith('.ico')) {
+						const buffer = Buffer.from(await response.arrayBuffer());
+						if (buffer.length > 0) {
+							const ext = faviconUrl.endsWith('.png') ? 'png' : 'ico';
+							const filename = `${domain.replace(/[^a-z0-9]/gi, '-')}-favicon-${Date.now()}.${ext}`;
+							return saveAsset(buffer, filename);
+						}
+					}
+				}
+			} catch {
+				// Try next favicon URL
+				continue;
+			}
+		}
+
+		return null;
+	} catch (error) {
+		console.error('Error downloading favicon:', error);
+		return null;
+	}
 }
 
 export { assetsPath };
