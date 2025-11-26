@@ -1,10 +1,22 @@
 import type { RequestHandler } from './$types';
 
+function escapeHtml(str: string): string {
+	return str
+		.replace(/&/g, '&amp;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;');
+}
+
 export const GET: RequestHandler = async ({ url }) => {
 	const origin = url.origin;
 
-	// Generate the bookmarklet code
-	const bookmarkletCode = `javascript:void(window.open('${origin}/save?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title)+'&description='+encodeURIComponent((document.querySelector('meta[name=description]')||{}).content||'')+'&image_url='+encodeURIComponent((document.querySelector('meta[property="og:image"]')||{}).content||''),'quickmark','width=500,height=600'))`;
+	// Simplified bookmarklet - just passes URL and title, lets server handle the rest
+	const bookmarkletCode = `javascript:(function(){window.open('${origin}/save?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title||''),'quickmark','width=500,height=600,scrollbars=yes')})()`;
+
+	// HTML-escape for safe embedding in attribute
+	const escapedCode = escapeHtml(bookmarkletCode);
 
 	// Create Netscape bookmark format HTML that Chrome can import
 	const html = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
@@ -15,7 +27,7 @@ export const GET: RequestHandler = async ({ url }) => {
 <TITLE>Bookmarks</TITLE>
 <H1>Bookmarks</H1>
 <DL><p>
-    <DT><A HREF="${bookmarkletCode}">Save to QuickMark</A>
+    <DT><A HREF="${escapedCode}">Save to QuickMark</A>
 </DL><p>
 `;
 
