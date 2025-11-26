@@ -39,8 +39,9 @@
 	});
 
 	function generateBookmarkletCode(apiUrl: string): string {
-		// Minified bookmarklet that opens popup
-		return `javascript:(function(){var s=document.createElement('script');s.src='${apiUrl}/bookmarklet.js?t='+Date.now();document.body.appendChild(s);})();`;
+		// Fully inline bookmarklet - no external script loading needed
+		// This bypasses CSP restrictions that block external scripts
+		return `javascript:(function(){var d=document,q=d.querySelector.bind(d),t=q('meta[property="og:title"]'),e=q('meta[property="og:description"]'),i=q('meta[property="og:image"]'),u=encodeURIComponent,p=new URLSearchParams({url:location.href,title:(t?t.content:d.title)||'',description:(e?e.content:'')||'',image_url:(i?i.content:'')||''});window.open('${apiUrl}/save?'+p.toString(),'quickmark','width=500,height=600')})();`;
 	}
 
 	function scrollToBookmark(index: number) {
