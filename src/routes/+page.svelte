@@ -39,9 +39,8 @@
 	});
 
 	function generateBookmarkletCode(apiUrl: string): string {
-		// Simplified inline bookmarklet - extracts metadata and opens popup
-		// Kept short to avoid Chrome truncation issues
-		return `javascript:void(window.open('${apiUrl}/save?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title)+'&description='+encodeURIComponent((document.querySelector('meta[name=description]')||{}).content||'')+'&image_url='+encodeURIComponent((document.querySelector('meta[property="og:image"]')||{}).content||''),'quickmark','width=500,height=600'))`;
+		// Simplified bookmarklet - just URL and title to avoid syntax errors
+		return `javascript:(function(){window.open('${apiUrl}/save?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title||''),'quickmark','width=500,height=600,scrollbars=yes')})()`;
 	}
 
 	function scrollToBookmark(index: number) {
