@@ -6,6 +6,10 @@
 	let title = $state('');
 	let description = $state('');
 	let imageUrl = $state('');
+	let screenshot = $state('');
+	let faviconUrl = $state('');
+	let imageChoice = $state<'site' | 'screenshot'>('site');
+	let siteImageFailed = $state(false);
 	let tags = $state('');
 	let saving = $state(false);
 	let message = $state('');
@@ -24,6 +28,9 @@
 		title = params.get('title') || '';
 		description = params.get('description') || '';
 		imageUrl = params.get('image_url') || '';
+		screenshot = params.get('screenshot') || '';
+		faviconUrl = params.get('favicon_url') || '';
+		imageChoice = imageUrl ? 'site' : 'screenshot';
 
 		// Fetch existing tags for autocomplete
 		try {
@@ -110,6 +117,12 @@
 		}
 	}
 
+	function handleSiteImageError() {
+		siteImageFailed = true;
+		// The server may still manage to download it, but the screenshot is a sure thing
+		if (screenshot) imageChoice = 'screenshot';
+	}
+
 	async function saveBookmark() {
 		if (!url.trim()) {
 			message = 'URL is required';
@@ -128,6 +141,9 @@
 					title: title.trim() || null,
 					description: description.trim() || null,
 					image_url: imageUrl.trim() || null,
+					screenshot: screenshot || null,
+					favicon_url: faviconUrl || null,
+					prefer: imageChoice,
 					tags: tags.trim() || null
 				})
 			});
@@ -176,30 +192,39 @@
 	{/if}
 
 	{#if !success}
-		<!-- Preview -->
-		{#if imageUrl || title}
-			<div class="card mb-3 bg-body-secondary">
-				<div class="row g-0">
-					{#if imageUrl}
-						<div class="col-4">
-							<img
-								src={imageUrl}
-								class="img-fluid rounded-start"
-								alt=""
-								style="max-height: 100px; width: 100%; object-fit: cover;"
-								onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-							/>
-						</div>
-					{/if}
-					<div class={imageUrl ? 'col-8' : 'col-12'}>
-						<div class="card-body py-2">
-							<p class="card-text small fw-bold mb-1 text-truncate">{title || 'Untitled'}</p>
-							<p class="card-text small text-muted text-truncate mb-0">{url}</p>
-						</div>
-					</div>
-				</div>
+		<!-- Preview: pick the site's own image or the screenshot -->
+		{#if (imageUrl && !siteImageFailed) || screenshot}
+			<div class="d-flex gap-2 mb-2">
+				{#if imageUrl && !siteImageFailed}
+					<button
+						type="button"
+						class="image-option"
+						class:selected={imageChoice === 'site'}
+						onclick={() => imageChoice = 'site'}
+						disabled={saving}
+					>
+						<img src={imageUrl} alt="" onerror={handleSiteImageError} />
+						<span>Site image</span>
+					</button>
+				{/if}
+				{#if screenshot}
+					<button
+						type="button"
+						class="image-option"
+						class:selected={imageChoice === 'screenshot'}
+						onclick={() => imageChoice = 'screenshot'}
+						disabled={saving}
+					>
+						<img src={screenshot} alt="" />
+						<span>Screenshot</span>
+					</button>
+				{/if}
 			</div>
 		{/if}
+		<div class="mb-3">
+			<p class="small fw-bold mb-0 text-truncate">{title || 'Untitled'}</p>
+			<p class="small text-muted text-truncate mb-0">{url}</p>
+		</div>
 
 		<div class="mb-3">
 			<label for="title" class="form-label small">Title</label>
@@ -294,5 +319,38 @@
 <style>
 	:global(body) {
 		min-height: auto;
+	}
+
+	.image-option {
+		flex: 0 1 50%;
+		min-width: 0;
+		padding: 0;
+		overflow: hidden;
+		border: 2px solid var(--bs-border-color);
+		border-radius: 0.5rem;
+		background: var(--bs-secondary-bg);
+		color: inherit;
+	}
+
+	.image-option.selected {
+		border-color: var(--bs-primary);
+	}
+
+	.image-option img {
+		display: block;
+		width: 100%;
+		aspect-ratio: 16 / 9;
+		object-fit: cover;
+	}
+
+	.image-option span {
+		display: block;
+		padding: 0.25rem;
+		font-size: 0.75rem;
+	}
+
+	.image-option.selected span::before {
+		content: '✓ ';
+		color: var(--bs-primary);
 	}
 </style>

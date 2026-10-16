@@ -1,6 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createBookmark, downloadAndSaveImage, downloadFavicon } from '$lib/server/db';
+import {
+	createBookmark,
+	deleteAsset,
+	downloadFavicon,
+	downloadPreviewImage,
+	fetchPageMetadata,
+	isCapturePath
+} from '$lib/server/db';
 
 // CORS headers for bookmarklet access
 const corsHeaders = {
@@ -15,7 +22,7 @@ export const OPTIONS: RequestHandler = async () => {
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
-		const { url, title, description, image_url, tags } = await request.json();
+		const { url, title, description, image_url, screenshot, favicon_url, prefer, tags } = await request.json();
 
 		if (!url || typeof url !== 'string') {
 			return json({ message: 'Invalid URL' }, { status: 400, headers: corsHeaders });
@@ -29,28 +36,31 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ message: 'Invalid URL format' }, { status: 400, headers: corsHeaders });
 		}
 
+		const pageUrl = urlObj.href;
 		const domain = urlObj.hostname;
+		const screenshotPath = isCapturePath(screenshot) ? screenshot : null;
 
-		// Download and save image if provided and valid
-		let og_image_path: string | null = null;
-		if (image_url && typeof image_url === 'string') {
-			// Validate image URL - must be http/https and not blocked
-			const isValidImageUrl = image_url.startsWith('http://') || image_url.startsWith('https://');
-			const isNotBlocked = !image_url.includes('about:blank') && !image_url.includes('data:');
-			if (isValidImageUrl && isNotBlocked) {
-				og_image_path = await downloadAndSaveImage(image_url, domain);
-			}
+		// Use the site's own preview image unless the screenshot was picked; each falls back to the other
+		let og_image_path = prefer === 'screenshot' ? screenshotPath : null;
+		og_image_path ??= await downloadPreviewImage([image_url], domain, pageUrl);
+		og_image_path ??= screenshotPath;
+
+		// Bookmarklet saves arrive with only a URL and title, so look the page up ourselves
+		const page = og_image_path ? null : await fetchPageMetadata(pageUrl);
+		og_image_path ??= await downloadPreviewImage(page?.images ?? [], domain, pageUrl);
+
+		if (screenshotPath && og_image_path !== screenshotPath) {
+			deleteAsset(screenshotPath);
 		}
 
-		// Download favicon
-		const favicon_path = await downloadFavicon(url, domain);
+		const favicon_path = await downloadFavicon(pageUrl, domain, [favicon_url, ...(page?.icons ?? [])]);
 
 		// Save bookmark
 		const bookmark = createBookmark({
-			url: urlObj.href,
+			url: pageUrl,
 			domain,
-			title: title || undefined,
-			description: description || undefined,
+			title: title || page?.title || undefined,
+			description: description || page?.description || undefined,
 			favicon_path: favicon_path || undefined,
 			og_image_path: og_image_path || undefined,
 			tags: tags || undefined
