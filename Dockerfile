@@ -1,6 +1,6 @@
 # Multi-stage build for QuickMark
 # Stage 1: Build the application
-FROM node:22-bookworm-slim AS builder
+FROM node:24-bookworm-slim AS builder
 
 # Install dependencies required for native modules (better-sqlite3)
 RUN apt-get update && apt-get install -y \
@@ -27,7 +27,7 @@ RUN npm run build
 RUN npm prune --production
 
 # Stage 2: Production image
-FROM node:22-bookworm-slim
+FROM node:24-bookworm-slim
 
 WORKDIR /app
 
