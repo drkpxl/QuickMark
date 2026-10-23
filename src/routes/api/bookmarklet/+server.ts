@@ -10,7 +10,9 @@ function escapeHtml(str: string): string {
 }
 
 export const GET: RequestHandler = async ({ url }) => {
-	const origin = url.origin;
+	// The page passes the address it was opened at, since behind Node the server itself assumes https
+	const requested = url.searchParams.get('origin') ?? '';
+	const origin = /^https?:\/\/[\w.-]+(:\d+)?$/.test(requested) ? requested : url.origin;
 
 	// Simplified bookmarklet - just passes URL and title, lets server handle the rest
 	const bookmarkletCode = `javascript:(function(){window.open('${origin}/save?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title||''),'quickmark','width=500,height=600,scrollbars=yes')})()`;

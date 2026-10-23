@@ -22,7 +22,8 @@ export const GET: RequestHandler = async ({ params }) => {
 			'jpeg': 'image/jpeg',
 			'gif': 'image/gif',
 			'svg': 'image/svg+xml',
-			'webp': 'image/webp'
+			'webp': 'image/webp',
+			'avif': 'image/avif'
 		};
 
 		const contentType = mimeTypes[ext || ''] || 'application/octet-stream';
@@ -30,7 +31,10 @@ export const GET: RequestHandler = async ({ params }) => {
 		return new Response(file, {
 			headers: {
 				'Content-Type': contentType,
-				'Cache-Control': 'public, max-age=31536000, immutable'
+				'Cache-Control': 'public, max-age=31536000, immutable',
+				// Downloaded SVGs can contain scripts; never let them run if opened directly
+				'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+				'X-Content-Type-Options': 'nosniff'
 			}
 		});
 	} catch (error) {
